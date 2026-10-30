@@ -27,10 +27,24 @@ A two-lesson decision game for Year 9 Geography (Settlements). Each student play
 2. Under **Build and deployment**, choose **Deploy from a branch**, branch **main**, folder **/ (root)**, and save.
 3. After a minute or two, the same page shows your site's address, something like `https://mrmroberts2010-a11y.github.io/Oberursel-2050/`.
 
+## Classes
+Four classes each have their own game, players, marks, leaderboard and results tab:
+
+| Class | Student link (add to your Pages address) |
+|---|---|
+| Roberts – Class 1 | `?class=roberts-1` |
+| Roberts – Class 2 | `?class=roberts-2` |
+| Stothard | `?class=stothard` |
+| Langellüddecke | `?class=langellueddecke` |
+
+For example: `https://mrmroberts2010-a11y.github.io/Oberursel-2050/?class=stothard`. Students who open the plain address choose their class on the join screen.
+
+To rename or add classes, edit `CLASSES` in both `index.html` and `apps-script/Code.gs` (the ids must match), then redeploy the Apps Script as a new version.
+
 ## Running the game
-- **Students:** post your GitHub Pages address in Canvas.
-- **Teacher:** open the same link with `?teacher=1` on the end and enter your password.
-- At the end, **Save results to the Google Sheet** adds a results tab. **Reset for the next class** clears the players.
+- **Students:** each teacher posts their class's student link in Canvas. No sign-in needed. If a shared iPad was used by someone else, the student taps **Not you?** to start fresh.
+- **Teacher:** open the address with `?teacher=1` on the end and enter the teacher password. Choose your class; switch class at any time from the top bar. Two teachers can run different classes at the same time.
+- At the end, **Save results to the Google Sheet** adds a results tab for that class. **Reset** clears only the selected class.
 
 ## Rounds
 | Lesson | Round | Decisions |

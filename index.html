@@ -412,7 +412,16 @@ const STARTERS={
 };
 
 /* ================= state ================= */
-let me=null,isGM=false,LOCAL=false,KEY=null,STUDENT_URL="";
+let me=null,isGM=false,LOCAL=false,KEY=null,STUDENT_URL="",CLS=null,pollTimer=null;
+/* Classes: ids must match CLASSES in apps-script/Code.gs */
+const CLASSES=[
+ {id:"roberts-1",name:"Roberts – Class 1",teacher:"Roberts"},
+ {id:"roberts-2",name:"Roberts – Class 2",teacher:"Roberts"},
+ {id:"stothard",name:"Stothard",teacher:"Stothard"},
+ {id:"langellueddecke",name:"Langellüddecke",teacher:"Langellüddecke"}
+];
+const className=id=>(CLASSES.find(c=>c.id===id)||{}).name||"";
+const URL_CLASS=(()=>{const c=new URLSearchParams(location.search).get("class");return CLASSES.some(x=>x.id===c)?c:null})();
 /* ===== SETUP: paste your Apps Script web app link between the quotes (see README) ===== */
 const API_URL="PASTE_YOUR_APPS_SCRIPT_WEB_APP_URL_HERE";
 /* ======================================================================================= */
@@ -438,8 +447,8 @@ const evOf=rid=>{const id=rid==="ev"?G.event:G.event2;return id?EVENTS.find(x=>x
 const chains={};
 function queue(path,fn){chains[path]=(chains[path]||Promise.resolve()).then(fn,fn);return chains[path]}
 function write(path,data){const[col,id]=path.split("/");
-  if(col==="players")return queue(path,()=>api("savePlayer",id,data));
-  if(col==="game")return queue(path,()=>api("setGame",KEY,data));
+  if(col==="players")return queue(path,()=>api("savePlayer",id,Object.assign({},data,{cls:CLS})));
+  if(col==="game")return queue(path,()=>api("setGame",KEY,CLS,data));
   if(col==="marks")return queue(path,()=>api("setMark",KEY,id,data));
   return Promise.resolve()}
 function saveLocal(){try{localStorage.setItem(LKEY,JSON.stringify({G,me:P[me]}))}catch(e){}}
@@ -631,10 +640,10 @@ function kick(id){return`<button class="btn small" data-kick="${id}" title="Remo
 function renderDesk(){
   const box=$("#gm");if(!box||!gmView())return;
   const ids=Object.keys(P).sort((a,b)=>String(P[a].name).localeCompare(String(P[b].name)));const r=G.round;
-  let h=(STUDENT_URL?`<p class="hint" style="margin:0 0 10px">Student link: <span class="mono" style="user-select:all;overflow-wrap:anywhere">${esc(STUDENT_URL)}</span></p>`:"")+`<div class="gm-title"><h3>Marking desk</h3><span class="status">${ids.length} player${ids.length===1?"":"s"} · ${ids.filter(id=>submitted(P[id],r)).length} submitted this round</span></div>`;
+  let h=(STUDENT_URL?`<p class="hint" style="margin:0 0 10px">Student link for ${esc(className(CLS))}: <span class="mono" style="user-select:all;overflow-wrap:anywhere">${esc(STUDENT_URL)}</span></p>`:"")+`<div class="gm-title"><h3>Marking desk</h3><span class="status">${ids.length} player${ids.length===1?"":"s"} · ${ids.filter(id=>submitted(P[id],r)).length} submitted this round</span></div>`;
   if(r==="ev"||r==="ev2"){const other=r==="ev"?G.event2:G.event;const cur=r==="ev"?G.event:G.event2;
     h+=`<div class="evctl"><button class="btn primary" data-drawevent="${r}">Draw an event at random</button><select id="pickevent" data-slot="${r}" class="btn" aria-label="Choose an event"><option value="">or choose a card…</option>${EVENTS.filter(x=>x.id!==other).map(x=>`<option value="${x.id}" ${cur===x.id?"selected":""}>${x.t}</option>`).join("")}</select></div>`}
-  if(!ids.length){box.innerHTML=h+`<p class="hint">No students yet. Post the student link in Canvas and ask students to open it and type their name.</p>`;return}
+  if(!ids.length){box.innerHTML=h+`<p class="hint">No students in ${esc(className(CLS))} yet. Post the student link above in Canvas and ask students to open it and type their name.</p>`;return}
   if(r==="r0"){
     h+=`<div class="tablewrap"><table><thead><tr><th>Player</th><th>Answers</th><th>Quiz</th><th></th></tr></thead><tbody>${ids.map(id=>{const p=P[id];
       return`<tr><td><b>${esc(p.name)}</b></td><td class="mono" style="font-size:12px">${p.quiz?QUIZ.map(q=>{const v=p.quiz[q.id];return v==null||v===""?"–":q.type==="grid"?esc(v):"abcd"[v]}).join(" "):"<span class='pill no'>not yet</span>"}</td><td class="mono">${quizScore(p)}/${QUIZ.length}</td><td>${kick(id)}</td></tr>`}).join("")}</tbody></table></div>`;
@@ -645,7 +654,7 @@ function renderDesk(){
     h+=`<div class="tablewrap"><table><thead><tr><th>Player</th><th>Pitch</th>${PITCH.map(x=>`<th>${x[0]}</th>`).join("")}</tr></thead><tbody>${ids.map(id=>{const p=P[id];const pm=(M[id]||{}).pitch||[];
       return`<tr data-player="${id}"><td><b>${esc(p.name)}</b></td><td class="why">${esc((p.why||{}).pitch||"")}</td>${PITCH.map((x,k)=>`<td>${seg([0,1,2],pm[k]??"","pm"+k)}</td>`).join("")}</tr>`}).join("")}</tbody></table></div>`;
   }else{
-    h+=`<p class="hint">Results are showing on every student's screen.</p><p><button class="btn primary" data-saveresults>Save results to the Google Sheet</button> <span class="status" id="savedres"></span></p><p>${ui.confirmReset?`Clear every player, answer and mark? <button class="btn on" data-reset2>Yes, start a new class</button> <button class="btn" data-cancelreset>Cancel</button>`:`<button class="btn" data-reset>Reset for the next class</button>`}</p>`;
+    h+=`<p class="hint">Results are showing on every screen in ${esc(className(CLS))}.</p><p><button class="btn primary" data-saveresults>Save results to the Google Sheet</button> <span class="status" id="savedres"></span></p><p>${ui.confirmReset?`Clear every player, answer and mark in ${esc(className(CLS))}? Other classes are not affected. <button class="btn on" data-reset2>Yes, start a new class</button> <button class="btn" data-cancelreset>Cancel</button>`:`<button class="btn" data-reset>Reset ${esc(className(CLS))}</button>`}</p>`;
   }
   box.innerHTML=h;
 }
@@ -741,9 +750,10 @@ function renderSteps(){
 }
 function renderTop(){
   const p=myDoc();
-  $("#who").innerHTML=gmView()?`<span class="label">Game master</span><button class="btn" data-preview>Student view</button><button class="btn" id="proj">${document.body.classList.contains("projector")?"Show marking":"Projector"}</button>`
+  const pickClass=`<select id="classpick" class="btn" aria-label="Class">${CLASSES.map(c=>`<option value="${c.id}" ${c.id===CLS?"selected":""}>${c.name}</option>`).join("")}</select>`;
+  $("#who").innerHTML=gmView()?`<span class="label">Game master</span>${pickClass}<button class="btn" data-preview>Student view</button><button class="btn" id="proj">${document.body.classList.contains("projector")?"Show marking":"Projector"}</button>`
    :isGM?`<span class="label">Previewing student view</span><button class="btn on" data-preview>Back to game master</button>`
-   :p?`<span class="label">Planner</span><b>${esc(p.name)}</b>${LOCAL?`<span class="pill">offline</span>`:""}`:"";
+   :p?`<span class="label">${esc(className(CLS))}</span><b>${esc(p.name)}</b><button class="btn small" data-notme title="Use this if someone else played on this device">Not you?</button>`:"";
   $("#tctl").innerHTML=gmView()?`${[3,5,10,15].map(m=>`<button class="btn small" data-timer="${m}">${m}m</button>`).join("")}<button class="btn small" data-timerstop>Stop</button>`:"";
 }
 
@@ -763,7 +773,9 @@ function renderAll(){
 function renderJoin(){
   $("#app").innerHTML=`<div class="join panel"><span class="label">Year 9 · Settlements</span><h2>Join the planning game</h2>
     <p>You are an urban planner deciding the future of Oberursel. You will make more than 15 decisions. Each has winners and losers, and each must be justified. Highest score wins.</p>
-    <label for="joinname" class="label">Your name (as your teacher knows you)</label><input id="joinname" maxlength="40" autocomplete="off" placeholder="First name and initial">
+    <span class="label">Your class</span>
+    <div class="segrow" style="margin:0">${CLASSES.map(c=>`<button class="btn ${ui.joinCls===c.id?"on":""}" data-joincls="${c.id}">${c.name}</button>`).join("")}</div>
+    <label for="joinname" class="label">Your name (as your teacher knows you)</label><input id="joinname" maxlength="40" autocomplete="off" placeholder="First name and initial" value="${esc(ui.joinName||"")}">
     <button class="btn primary big" data-join>Join the game</button><span class="status err" id="joinmsg"></span></div>`;
 }
 
@@ -790,7 +802,10 @@ async function removeDocs(ids){await api("kick",KEY,ids)}
 
 document.addEventListener("click",async e=>{
   const b=e.target.closest("button,[data-hl],svg#town");if(!b)return;const d=b.dataset||{};
-  if(d.join!==undefined){const n=$("#joinname").value.trim();if(n.length<2){$("#joinmsg").textContent="Type your name first.";return}
+  if(d.joincls){ui.joinCls=d.joincls;ui.joinName=$("#joinname").value;renderJoin();return}
+  if(d.notme!==undefined){newId(CLS);delete P[me];me=getId(CLS);ui.joinCls=CLS;ui.joinName="";$("#app").innerHTML="";renderAll();return}
+  if(d.join!==undefined){const n=$("#joinname").value.trim();if(!ui.joinCls){$("#joinmsg").textContent="Choose your class first.";return}if(n.length<2){$("#joinmsg").textContent="Type your name first.";return}
+    if(ui.joinCls!==CLS)await switchClass(ui.joinCls,true);
     P[me]={name:n,why:{},joined:Date.now()};$("#joinmsg").textContent="Joining…";
     try{await write("players/"+me,P[me]);$("#app").innerHTML="";renderAll()}catch(err){delete P[me];$("#joinmsg").textContent="Couldn't join. Check your internet connection and try again."}return}
   if(d.preview!==undefined){ui.preview=!ui.preview;$("#app").innerHTML="";renderAll();return}
@@ -806,11 +821,11 @@ document.addEventListener("click",async e=>{
   if(d.kick){const id=d.kick;delete P[id];delete M[id];renderDesk();renderBoard();if(!LOCAL){try{await removeDocs([id])}catch(err){alertBar("Couldn't remove that player.")}}return}
   if(d.saveresults!==undefined){const hd=["Rank","Name","Economy","Environment","Community","Connectivity","Average","Penalties","Quiz","Justification marks","Pitch","Total","Homes","Transport","Energy","Project","Attractions"];
     const rows=ranked().map((x,i)=>[i+1,x.p.name,x.c.ind.eco,x.c.ind.env,x.c.ind.com,x.c.ind.con,+x.c.si.toFixed(1),x.c.penalty,x.c.quiz,x.c.just,x.c.pitch,x.c.total,x.p.r1||"",x.p.r2||"",x.p.en||"",x.p.r3||"",(x.p.attr||[]).join(", ")]);
-    $("#savedres").textContent="Saving…";try{const nm=await api("saveResults",KEY,hd,rows);$("#savedres").textContent="Saved to the tab “"+nm+"”."}catch(err){$("#savedres").textContent="Couldn't save the results."}return}
+    $("#savedres").textContent="Saving…";try{const nm=await api("saveResults",KEY,CLS,hd,rows);$("#savedres").textContent="Saved to the tab “"+nm+"”."}catch(err){$("#savedres").textContent="Couldn't save the results."}return}
   if(d.reset!==undefined){ui.confirmReset=true;renderDesk();return}
   if(d.cancelreset!==undefined){ui.confirmReset=false;renderDesk();return}
   if(d.reset2!==undefined){ui.confirmReset=false;const ids=Object.keys(P);ids.forEach(id=>{delete P[id];delete M[id]});
-    try{await api("resetAll",KEY)}catch(err){alertBar("Some players couldn't be removed.")}
+    try{await api("resetAll",KEY,CLS)}catch(err){alertBar("Some players couldn't be removed.")}
     setGame({round:"r0",event:null,event2:null,timerEnd:null});return}
   const tr=b.closest("tr[data-player]");
   if(tr&&d.mark!==undefined){setMark(tr.dataset.player,{j:{[G.round]:+d.mark}});return}
@@ -849,14 +864,25 @@ setInterval(()=>{const c=$("#clock");if(!c)return;if(!G.timerEnd){c.textContent=
   const left=Math.max(0,Math.round((G.timerEnd-Date.now())/1000));c.textContent=String(Math.floor(left/60)).padStart(2,"0")+":"+String(left%60).padStart(2,"0");c.classList.toggle("low",left<=30)},500);
 
 /* ================= boot ================= */
-function getId(){const mk=()=>Array.from({length:16},()=>"abcdefghijklmnopqrstuvwxyz0123456789"[Math.floor(Math.random()*36)]).join("");
-  try{let v=localStorage.getItem("ou2050-id");if(!v){v=mk();localStorage.setItem("ou2050-id",v)}return v}catch(e){return mk()}}
+function mkId(){return Array.from({length:16},()=>"abcdefghijklmnopqrstuvwxyz0123456789"[Math.floor(Math.random()*36)]).join("")}
+const memIds={};
+function getId(cls){const k="ou2050-id-"+cls;try{let v=localStorage.getItem(k);if(!v){v=mkId();localStorage.setItem(k,v)}return v}catch(e){return memIds[k]||(memIds[k]=mkId())}}
+function newId(cls){const k="ou2050-id-"+cls;const v=mkId();memIds[k]=v;try{localStorage.setItem(k,v)}catch(e){}}
+function resetClassState(){Object.keys(P).forEach(k=>delete P[k]);Object.keys(M).forEach(k=>delete M[k]);G={round:"r0",event:null,event2:null,timerEnd:null};ui.drafts={};ui.msg={};ui.quizDraft={};ui.sphereFor=null;ui.confirmReset=false}
+async function switchClass(cls,keepScreen){
+  CLS=cls;me=getId(cls);resetClassState();STUDENT_URL=location.origin+location.pathname+"?class="+cls;
+  try{localStorage.setItem(isGM?"ou2050-teacher-class":"ou2050-class",cls)}catch(e){}
+  if(!keepScreen){$("#app").innerHTML=`<p class="status" style="margin-top:20px">Loading ${esc(className(cls))}…</p>`}
+  await poll(true);
+  if(!pollTimer)pollTimer=setInterval(poll,isGM?4000:6000);
+}
 let polling=false;
-async function poll(){
-  if(polling)return;polling=true;
+async function poll(force){
+  if(!CLS)return;
+  if(polling&&!force)return;polling=true;
   try{
-    const s=await api("getState",KEY||"",me);
-    
+    const s=await api("getState",KEY||"",me,CLS);
+    if(s.cls!==CLS)return;
     const prev=JSON.stringify([G.round,G.event,G.event2]);
     if(s.game)G=Object.assign({round:"r0",event:null,event2:null,timerEnd:null},s.game);
     const seen=new Set(Object.keys(s.players||{}));
@@ -868,6 +894,14 @@ async function poll(){
     else{renderBoard();renderDesk();renderMine();if(gmView())renderMap()}
   }catch(e){}finally{polling=false}
 }
+function renderClassPicker(){
+  renderTop();
+  $("#app").innerHTML=`<div class="join panel"><span class="label">Game master</span><h2>Which class are you teaching?</h2>
+    <p>Each class has its own game, leaderboard and marks. You can switch class at any time from the top bar.</p>
+    <div class="opts three">${CLASSES.map(c=>`<button class="opt sm" data-teachcls="${c.id}"><h3>${c.name}</h3><span class="grid-ref">${c.teacher}</span></button>`).join("")}</div></div>`;
+}
+document.addEventListener("click",e=>{const b=e.target.closest("[data-teachcls]");if(b)switchClass(b.dataset.teachcls)});
+document.addEventListener("change",e=>{if(e.target.id==="classpick"&&e.target.value!==CLS)switchClass(e.target.value)});
 function renderLogin(err){
   $("#app").innerHTML=`<div class="join panel"><span class="label">Teacher</span><h2>Game master login</h2>
     <label for="pw" class="label">Teacher password</label><input id="pw" type="password" autocomplete="current-password">
@@ -877,19 +911,22 @@ document.addEventListener("click",async e=>{const b=e.target.closest("[data-logi
   const pw=$("#pw").value;$("#loginmsg").textContent="Checking…";
   let ok=false;try{ok=await api("checkKey",pw)}catch(err){}
   if(!ok){$("#loginmsg").textContent="That password isn't right.";return}
-  KEY=pw;try{localStorage.setItem("ou2050-key",pw)}catch(err){}isGM=true;$("#app").innerHTML="";start()});
+  KEY=pw;try{localStorage.setItem("ou2050-key",pw)}catch(err){}isGM=true;$("#app").innerHTML="";startTeacher()});
 document.addEventListener("keydown",e=>{if(e.key==="Enter"&&e.target.id==="pw"){const b=document.querySelector("[data-login]");if(b)b.click()}});
-async function start(){await poll();if(!$("#stage")&&!$("#joinname"))renderAll();setInterval(poll,isGM?4000:6000)}
+function startTeacher(){
+  let c=URL_CLASS;if(!c){try{c=localStorage.getItem("ou2050-teacher-class")}catch(e){}}
+  if(c&&CLASSES.some(x=>x.id===c))switchClass(c);else renderClassPicker();
+}
 (async function boot(){
-  me=getId();STUDENT_URL=location.origin+location.pathname;
   if(!CONFIGURED){$("#app").innerHTML=`<div class="join panel"><span class="label">Setup needed</span><h2>Almost there</h2><p>This page isn't connected to its Google Sheet yet. Open <span class="mono">index.html</span> on GitHub and paste your Apps Script web app link into <span class="mono">API_URL</span> near the top of the script. The README explains each step.</p></div>`;return}
   if(MODE==="teacher"){
     try{KEY=localStorage.getItem("ou2050-key")}catch(e){}
     let ok=false;if(KEY){try{ok=await api("checkKey",KEY)}catch(e){}}
     if(!ok){KEY=null;renderLogin();return}
-    isGM=true;
+    isGM=true;startTeacher();return;
   }
-  start();
+  let c=URL_CLASS;if(!c){try{c=localStorage.getItem("ou2050-class")}catch(e){}}
+  if(c&&CLASSES.some(x=>x.id===c)){ui.joinCls=c;switchClass(c)}else renderJoin();
 })();
 </script>
 </body>
