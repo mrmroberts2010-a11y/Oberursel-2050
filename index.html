@@ -1,934 +1,199 @@
-<!doctype html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Oberursel 2050</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
-<style>
-/* Layout: planning-office console. Student: decision stage left, map + own town + class leaderboard right. Teacher: same frame with round controls and a marking desk. */
-:root{
-  --bg:#eaeee9; --surface:#fbfcfa; --sunk:#dfe5df; --ink:#1b2826; --muted:#56655f; --line:#c3ccc4;
-  --accent:#b8322a; --accent-soft:#f3dcd8; --on-accent:#ffffff;
-  --forest:#9dbb94; --forest-ink:#3f6b3a; --water:#2f74b0; --built:#dccfbb; --road:#d99a2b;
-  --ubahn:#2b56a3; --sbahn:#23824f; --paper:#f4f0e2;
-  --good:#2f7d4a; --warn:#b07a12; --bad:#b8322a;
-  --f-display:"Barlow Condensed","Arial Narrow",Arial,sans-serif;
-  --f-body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
-  --f-mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
-}
-@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
-  --bg:#121917; --surface:#1a2321; --sunk:#222d2a; --ink:#e3ebe7; --muted:#9aaba4; --line:#33413d;
-  --accent:#e2675c; --accent-soft:#3a2321; --on-accent:#1a0d0b;
-  --forest:#35523a; --forest-ink:#9cc795; --water:#5ea3dd; --built:#4a4337; --road:#e0a843;
-  --ubahn:#7aa0e8; --sbahn:#5cc48a; --paper:#26271f; --good:#5cc48a; --warn:#e0a843; --bad:#e2675c; color-scheme:dark}}
-:root[data-theme="dark"]{
-  --bg:#121917; --surface:#1a2321; --sunk:#222d2a; --ink:#e3ebe7; --muted:#9aaba4; --line:#33413d;
-  --accent:#e2675c; --accent-soft:#3a2321; --on-accent:#1a0d0b;
-  --forest:#35523a; --forest-ink:#9cc795; --water:#5ea3dd; --built:#4a4337; --road:#e0a843;
-  --ubahn:#7aa0e8; --sbahn:#5cc48a; --paper:#26271f; --good:#5cc48a; --warn:#e0a843; --bad:#e2675c; color-scheme:dark}
+/**
+ * Oberursel 2050 – planning decision game (Year 9 Settlements)
+ * Google Apps Script data service for the GitHub Pages game. Data is stored in the Google Sheet
+ * this script is attached to. Each class has its own game, players, marks and results.
+ *
+ * 1. Change TEACHER_PASSWORD below before you deploy.
+ * 2. Add an HTML file called Index (File + > HTML) and paste in apps-script/Index.html.
+ * 3. Deploy > New deployment > Web app > Execute as: Me, Who has access: Anyone within your school (or Anyone).
+ * 4. Students open the web app link + ?class=<class id>. Teachers open it + ?teacher=1.
+ */
+const TEACHER_PASSWORD = 'change-me';
 
-*{box-sizing:border-box}
-body{background:var(--bg);color:var(--ink);font:15px/1.5 var(--f-body);
-  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:0 40px}
-h1,h2,h3{font-family:var(--f-display);text-wrap:balance;margin:0;line-height:1.05}
-button{font:inherit;color:inherit;cursor:pointer}
-button:disabled{opacity:.45;cursor:default}
-button:focus-visible,select:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-.mono{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
-.label{font:600 11px/1 var(--f-body);letter-spacing:.09em;text-transform:uppercase;color:var(--muted)}
-.muted{color:var(--muted)}
-
-.top{display:flex;flex-wrap:wrap;align-items:center;gap:12px 18px;padding-block:14px 12px;border-bottom:2px solid var(--ink)}
-.brand{display:flex;align-items:baseline;gap:10px;margin-right:auto;flex-wrap:wrap}
-.brand h1{font-size:34px;font-weight:700}
-.brand h1 span{color:var(--accent)}
-.brand .sub{color:var(--muted);font-size:13px}
-.who{display:flex;align-items:center;gap:8px;font-size:14px;flex-wrap:wrap}
-.who b{font-family:var(--f-display);font-size:20px}
-.timer{display:flex;align-items:center;gap:6px;background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:4px 6px;flex-wrap:wrap}
-.clock{font:500 22px/1 var(--f-mono);min-width:66px;text-align:center}
-.clock.low{color:var(--bad)}
-.btn{border:1px solid var(--line);background:var(--surface);border-radius:5px;padding:5px 10px;font-size:13px}
-.btn:hover:not(:disabled){border-color:var(--ink)}
-.btn.primary{background:var(--ink);color:var(--bg);border-color:var(--ink)}
-.btn.big{padding:9px 16px;font:600 18px var(--f-display);letter-spacing:.02em}
-.btn.small{padding:2px 7px;font-size:12px}
-.btn.on{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
-.status{font-size:13px;color:var(--muted)}
-.status.ok{color:var(--good)} .status.err{color:var(--bad)}
-
-.steps{display:flex;overflow-x:auto;margin-block:14px;border:1px solid var(--line);border-radius:6px;background:var(--surface)}
-.step{flex:1 0 auto;border:0;border-right:1px solid var(--line);background:none;padding:8px 12px;text-align:left;min-width:108px}
-.step:last-child{border-right:0}
-.step .l{display:block;font:600 10px/1 var(--f-body);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
-.step .t{display:block;font:600 16px/1.2 var(--f-display);margin-top:3px}
-.step[aria-current="true"]{background:var(--ink);color:var(--bg)}
-.step[aria-current="true"] .l{color:var(--bg);opacity:.75}
-.step.locked{color:var(--muted)}
-.step.done .t::after{content:" ✓";color:var(--good)}
-
-.layout{display:grid;grid-template-columns:minmax(0,1.45fr) minmax(0,1fr);gap:18px;align-items:start}
-@media (max-width:980px){.layout{grid-template-columns:1fr}}
-.panel{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:18px 20px;min-width:0}
-.stack{display:flex;flex-direction:column;gap:18px;min-width:0}
-
-.stage-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;flex-wrap:wrap}
-.stage-head h2{font-size:40px;font-weight:700}
-.stage-head .when{font:500 13px var(--f-mono);color:var(--muted);white-space:nowrap}
-.brief{font-size:17px;max-width:66ch;margin:10px 0 16px}
-.facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:6px;overflow:hidden;margin-bottom:16px}
-.fact{background:var(--surface);padding:10px 12px}
-.fact b{display:block;font:600 26px/1.1 var(--f-display)}
-.fact span{font-size:12px;color:var(--muted)}
-.chips{display:flex;flex-wrap:wrap;gap:6px;margin-block:8px 16px}
-.chip{border:1px solid var(--line);border-radius:999px;padding:3px 10px;font-size:13px;background:var(--sunk)}
-.chip b{font-weight:600}
-
-.decision{margin-top:18px}
-.decision>h3{font-size:24px;display:flex;gap:10px;align-items:baseline;flex-wrap:wrap}
-.decision>h3 .n{font:600 12px var(--f-mono);color:var(--accent);letter-spacing:.06em}
-.decision>p{margin:4px 0 10px;color:var(--muted);font-size:14px;max-width:66ch}
-
-.quiz{display:flex;flex-direction:column;gap:10px;margin-top:10px}
-.qrow{display:grid;grid-template-columns:28px 1fr;gap:8px;padding:10px;border:1px solid var(--line);border-radius:6px}
-.qrow.active{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-soft)}
-.qrow .num{font:600 20px/1.1 var(--f-display);color:var(--accent)}
-.qrow .ctl{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;align-items:center}
-.gridin{width:64px;text-transform:uppercase;font:600 16px var(--f-mono);text-align:center;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:4px;padding:4px}
-.mc{border:1px solid var(--line);background:var(--surface);border-radius:5px;padding:6px 10px;text-align:left;font-size:14px;width:100%}
-.mc[aria-pressed="true"]{border-color:var(--ink);background:var(--ink);color:var(--bg)}
-.mark{font:600 13px var(--f-mono)}
-.mark.y{color:var(--good)} .mark.n{color:var(--bad)}
-
-.opts{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px}
-.opts.three{grid-template-columns:repeat(auto-fit,minmax(170px,1fr))}
-.opt{border:1px solid var(--line);border-radius:7px;padding:14px;display:flex;flex-direction:column;gap:8px;background:var(--surface);min-width:0;text-align:left}
-.opt.sm{padding:10px 12px;gap:6px}
-.opt.sm h3{font-size:18px}
-button.opt:hover:not(:disabled){border-color:var(--ink)}
-.opt[aria-pressed="true"]{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
-.opt[aria-pressed="true"] .letter{background:var(--accent);color:var(--on-accent)}
-.opt-top{display:flex;gap:10px;align-items:flex-start}
-.letter{flex:none;width:34px;height:34px;border-radius:5px;background:var(--ink);color:var(--bg);display:grid;place-items:center;font:700 22px/1 var(--f-display)}
-.opt h3{font-size:21px;font-weight:600}
-.opt .grid-ref{font:500 12px var(--f-mono);color:var(--muted)}
-.opt p{margin:0;font-size:14px}
-.wl{display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:13px}
-.wl div{background:var(--sunk);border-radius:5px;padding:6px 8px}
-.wl .w b{color:var(--good)} .wl .lo b{color:var(--bad)}
-.meta{display:flex;flex-wrap:wrap;gap:6px 12px;font:500 12px var(--f-mono);color:var(--muted);margin-top:auto}
-.deltas{display:flex;flex-wrap:wrap;gap:4px}
-.d{font:500 11px var(--f-mono);padding:1px 6px;border-radius:3px;background:var(--sunk)}
-.d.p{color:var(--good)} .d.n{color:var(--bad)}
-
-.letter-card{background:var(--paper);border:1px solid var(--line);border-radius:4px;padding:16px 18px;position:relative}
-.letter-card .from{font:600 11px var(--f-body);letter-spacing:.08em;text-transform:uppercase;color:var(--accent)}
-.letter-card blockquote{margin:6px 0 12px;font:500 20px/1.3 var(--f-display)}
-.letter-card .opts{grid-template-columns:repeat(auto-fit,minmax(200px,1fr))}
-
-.answer{margin-top:22px;border-top:2px solid var(--ink);padding-top:14px;display:flex;flex-direction:column;gap:8px}
-.answer label{font:600 20px var(--f-display)}
-textarea{width:100%;min-height:120px;border:1px solid var(--line);border-radius:6px;background:var(--surface);color:var(--ink);font:15px/1.5 var(--f-body);padding:10px;resize:vertical}
-.answer .row{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
-.wc{font:500 12px var(--f-mono);color:var(--muted)}
-.checklist{display:flex;flex-wrap:wrap;gap:6px;font:500 12px var(--f-mono)}
-.checklist span{padding:2px 7px;border-radius:3px;background:var(--sunk);color:var(--muted)}
-.checklist span.ok{color:var(--good)}
-.locked-note{background:var(--sunk);border-radius:6px;padding:10px 12px;font-size:14px;white-space:pre-wrap}
-
-.event-card{border:2px solid var(--ink);border-radius:8px;padding:18px;background:var(--surface);position:relative;margin-bottom:14px}
-.event-card .tag{position:absolute;top:-11px;left:14px;background:var(--accent);color:var(--on-accent);font:600 11px/1 var(--f-body);letter-spacing:.08em;text-transform:uppercase;padding:5px 8px;border-radius:3px}
-.event-card h3{font-size:30px;margin-top:4px}
-.event-card p{font-size:16px;max-width:64ch}
-.hitnote{font-size:14px;margin:8px 0 0;color:var(--bad)}
-
-.join{max-width:520px;margin:40px auto;display:flex;flex-direction:column;gap:14px}
-.join h2{font-size:44px}
-.join input{border:1px solid var(--line);border-radius:6px;background:var(--surface);color:var(--ink);font:18px var(--f-body);padding:10px 12px}
-
-.gm-title{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px}
-.gm-title h3{font-size:22px}
-.tablewrap{overflow-x:auto}
-table{border-collapse:collapse;width:100%;font-size:14px}
-th{text-align:left;font:600 11px var(--f-body);letter-spacing:.06em;text-transform:uppercase;color:var(--muted);padding:6px;border-bottom:1px solid var(--line);white-space:nowrap}
-td{padding:7px 6px;border-bottom:1px solid var(--line);vertical-align:top}
-td.why{min-width:240px;max-width:460px;font-size:13px;white-space:pre-wrap;overflow-wrap:anywhere}
-.seg{display:inline-flex;border:1px solid var(--line);border-radius:5px;overflow:hidden}
-.seg button{border:0;border-right:1px solid var(--line);background:var(--surface);padding:3px 9px;font:600 13px var(--f-mono);min-width:30px}
-.seg button:last-child{border-right:0}
-.seg button[aria-pressed="true"]{background:var(--accent);color:var(--on-accent)}
-.hint{font-size:13px;color:var(--muted);margin:8px 0 0}
-.rubric{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin-top:10px}
-.rubric div{background:var(--sunk);border-radius:5px;padding:8px;font-size:13px}
-.rubric b{font:600 18px var(--f-display);color:var(--accent);display:block}
-.pill{display:inline-block;font:600 11px var(--f-mono);padding:1px 6px;border-radius:3px;background:var(--sunk)}
-.pill.no{color:var(--muted)}
-.evctl{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:10px}
-
-.maptabs{display:flex;gap:6px;flex-wrap:wrap}
-.mapbox{border:1px solid var(--line);border-radius:6px;overflow:hidden;background:var(--sunk)}
-.mapbox svg{display:block;width:100%;height:auto}
-.mapbox.picking{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-soft)}
-.mapbox.picking svg{cursor:crosshair}
-.layers{display:flex;flex-wrap:wrap;gap:6px 12px;margin-top:10px;font-size:13px}
-.layers label{display:flex;align-items:center;gap:5px;cursor:pointer}
-.legend{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:12px;color:var(--muted);margin-top:8px}
-.legend span{display:inline-flex;align-items:center;gap:5px}
-.sw{width:14px;height:10px;border-radius:2px;display:inline-block}
-
-.mine{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
-.bar{font:500 11px var(--f-mono);color:var(--muted)}
-.bar i{display:block;height:7px;border-radius:3px;background:var(--sunk);margin-top:3px;overflow:hidden}
-.bar i s{display:block;height:100%;text-decoration:none}
-.minemeta{display:flex;flex-wrap:wrap;gap:6px 14px;font:500 12px var(--f-mono);color:var(--muted);margin-top:10px}
-.minemeta .neg{color:var(--bad)}
-.lb{list-style:none;margin:0;padding:0}
-.lb li{display:grid;grid-template-columns:28px minmax(0,1fr) auto;gap:8px;align-items:baseline;padding:7px 0;border-bottom:1px solid var(--line)}
-.lb li:last-child{border-bottom:0}
-.lb .rk{font:500 13px var(--f-mono);color:var(--muted)}
-.lb .nm{font:600 18px/1.15 var(--f-display);overflow-wrap:anywhere}
-.lb .ch{display:block;font:500 11px var(--f-mono);color:var(--muted)}
-.lb .tot{font:600 24px/1 var(--f-display)}
-.lb li.me{background:var(--accent-soft);margin-inline:-8px;padding-inline:8px;border-radius:5px}
-.results td.num,.results th.num{text-align:right;font-family:var(--f-mono);font-variant-numeric:tabular-nums}
-
-body.projector .gm{display:none!important}
-@media (max-width:560px){.stage-head h2{font-size:30px}.brand h1{font-size:28px}.wl{grid-template-columns:1fr}}
-@media (prefers-reduced-motion:no-preference){.opt,.step,.mc{transition:background .15s,border-color .15s,box-shadow .15s}}
-html{-webkit-text-size-adjust:100%}
-body{margin:0}
-img{max-width:100%}
-[hidden]{display:none!important}
-</style>
-</head>
-<body>
-
-<header class="top">
-  <div class="brand"><h1>Oberursel <span>2050</span></h1><span class="sub">Planning decision game · Year 9 Settlements</span></div>
-  <div class="who" id="who"></div>
-  <div class="timer" aria-label="Round timer"><span class="clock mono" id="clock">--:--</span><span id="tctl"></span></div>
-</header>
-<div id="app"><p class="status" style="margin-top:20px">Connecting to the class game…</p></div>
-
-<script>
-/* ================= content ================= */
-const IND=[["eco","Economy"],["env","Environment"],["com","Community"],["con","Connectivity"]];
-const BUDGET=75, TARGET=1500, MINWORDS=20;
-const ROUNDS=[
- {id:"r0",lesson:1,title:"Map quiz",when:"L1 · 0–12 min"},
- {id:"r1",lesson:1,title:"New homes",when:"L1 · 12–32 min"},
- {id:"r2",lesson:1,title:"Moving people",when:"L1 · 32–46 min"},
- {id:"en",lesson:1,title:"Power the town",when:"L1 · 46–60 min"},
- {id:"ev",lesson:2,title:"Breaking news",when:"L2 · 0–10 min"},
- {id:"r3",lesson:2,title:"Sphere of influence",when:"L2 · 10–28 min"},
- {id:"ev2",lesson:2,title:"Second shock",when:"L2 · 28–36 min"},
- {id:"pitch",lesson:2,title:"Your pitch",when:"L2 · 36–50 min"},
- {id:"results",lesson:2,title:"Results",when:"L2 · 50–60 min"}
-];
-const RI=id=>ROUNDS.findIndex(r=>r.id===id);
-const MARKED=["r1","r2","en","ev","r3","ev2"];
-
-const QUIZ=[
- {id:"q1",type:"grid",q:"Find the Altstadt on the map. Which grid square is it in?",a:"C3"},
- {id:"q2",type:"grid",q:"Which grid square holds Hohemark, the end of the U3 line?",a:"B2"},
- {id:"q3",type:"grid",q:"Which grid square has the A661 “Oberursel” motorway junction?",a:"F4"},
- {id:"q4",type:"mc",q:"In which direction does the Urselbach flow?",opts:["North-west → south-east","South-east → north-west","West → east","South → north"],a:0},
- {id:"q5",type:"mc",q:"Which statement describes Oberursel's SITUATION, not its site?",opts:["It is built on gentle slopes at the foot of the Taunus","It is about 16 km north-west of Frankfurt, linked by the S5 and U3","It had clean water from the Urselbach","It lies about 200 m above sea level"],a:1},
- {id:"q6",type:"mc",q:"People from Oberursel travel to Frankfurt for the airport, university and opera. This shows that…",opts:["Oberursel's sphere of influence is bigger than Frankfurt's","Frankfurt is higher in the settlement hierarchy, and its sphere of influence includes Oberursel","Oberursel has no services at all","Frankfurt is a commuter settlement"],a:1}
-];
-
-/* Main choice per decision round */
-const OPT={
- r1:{
-  A:{t:"Weißkirchen-Ost fields",g:"D5",homes:1500,cost:10,d:{eco:8,env:-10,com:3,con:6},
-     p:"Build a new estate on farmland at the rural–urban fringe, next to Weißkirchen-Ost station where the S5 and U3 meet.",
-     w:"Commuters (two rail lines), builders, young families",l:"Farmers, wildlife, the green gap between Oberursel and Frankfurt",tags:"Greenfield · urban sprawl"},
-  B:{t:"Drei Hasen brownfield",g:"E3",homes:1200,cost:22,d:{eco:4,env:4,com:0,con:2},
-     p:"Clear old warehouses and offices beside the A661 and build flats. The land must be decontaminated and noise walls built.",
-     w:"Green spaces are saved, derelict land is reused",l:"Taxpayers (most expensive), residents living with motorway noise",tags:"Brownfield · regeneration"},
-  C:{t:"Densify around the Bahnhof",g:"C3",homes:1500,cost:12,d:{eco:6,env:2,com:-6,con:8},
-     p:"Replace car parks and low buildings near Oberursel Bahnhof with 6–8 storey apartment blocks.",
-     w:"People without cars, town-centre shops, the countryside",l:"Existing residents (shade, crowding, loss of character), drivers",tags:"Infill · high density"},
-  D:{t:"Hohemark forest-edge villas",g:"B2",homes:400,cost:4,d:{eco:10,env:-12,com:-5,con:-4},
-     p:"Release forest-edge land below the Taunus for large, expensive detached houses. Wealthy buyers pay high local taxes.",
-     w:"The town budget, wealthy incomers",l:"Taunus forest, walkers, families who can't afford €1m homes. Only 400 homes!",tags:"Greenfield · low density"}
- },
- r2:{
-  A:{t:"U3 upgrade + Park & Ride",g:"B2",cost:14,d:{eco:2,env:4,com:1,con:8},
-     p:"Run the U3 every 7½ minutes and build a Park & Ride at Hohemark so Taunus villagers leave their cars at the edge of town.",
-     w:"Commuters to Frankfurt, villages beyond the Taunus",l:"Budget; Hohemark residents get a big car park",tags:"Public transport"},
-  B:{t:"Cycle superhighway",g:"C3 → C5",cost:9,d:{eco:1,env:7,com:3,con:5},
-     p:"A wide, separated cycle route from the Altstadt to Frankfurt (16 km) and Bad Homburg, with e-bike parking at stations.",
-     w:"Health, climate, students and young commuters",l:"Drivers lose road space; hilly northern districts benefit less",tags:"Active travel"},
-  C:{t:"A661 junction + town car park",g:"F4 / C3",cost:12,d:{eco:6,env:-8,com:-2,con:7},
-     p:"Widen the Oberursel junction on the A661 and build a 600-space multi-storey car park next to the Altstadt.",
-     w:"Shops, delivery firms, drivers from villages",l:"Air quality, climate targets, people living on main roads",tags:"Road building"},
-  D:{t:"Electric on-demand town bus",g:"all districts",cost:10,d:{eco:0,env:3,com:7,con:4},
-     p:"Small electric buses booked by app link Oberstedten, Stierstadt, Weißkirchen and Bommersheim. Free for under-18s and over-65s.",
-     w:"Teenagers, elderly people, families without a second car",l:"Budget every year; doesn't help commuting to Frankfurt much",tags:"Public transport · equity"}
- },
- en:{
-  A:{t:"Wind turbines on the Taunus ridge",g:"A1 (off map, NW)",cost:8,d:{eco:4,env:8,com:-5,con:0},
-     p:"Six turbines on the ridge near the Großer Feldberg would make enough electricity for every home in Oberursel.",
-     w:"Climate, energy bills, landowners who rent out land",l:"Hikers, the view from the Feldberg, birds and bats",tags:"Renewable · landscape conflict"},
-  B:{t:"Solar on every roof + batteries",g:"all districts",cost:11,d:{eco:1,env:6,com:2,con:0},
-     p:"Grants put solar panels and home batteries on houses, schools and the new estate.",
-     w:"Home owners' bills, no change to the landscape",l:"Budget; protected Altstadt roofs can't take panels; renters benefit less",tags:"Renewable · small-scale"},
-  C:{t:"District heating plant at Drei Hasen",g:"E3",cost:7,d:{eco:4,env:4,com:0,con:0},
-     p:"A plant burning waste wood from the Taunus pipes hot water to new homes and the town centre.",
-     w:"New estates, local jobs, uses dead spruce",l:"Lorry traffic and air quality near the A661, neighbours of the plant",tags:"Biomass · local energy"},
-  D:{t:"Buy green power from elsewhere",g:"none",cost:3,d:{eco:-2,env:2,com:0,con:0},
-     p:"Sign a long contract for offshore wind power from the North Sea instead of building anything locally.",
-     w:"Cheap, no local conflict",l:"Money leaves the town; Oberursel builds nothing itself",tags:"Imported energy"}
- },
- r3:{
-  A:{t:"Out-of-town retail park",g:"F2",cost:6,km:12,d:{eco:10,env:-6,com:-6,con:-2},
-     p:"Large stores and a cinema at the Oberursel-Nord junction. Shoppers would drive in from Bad Homburg, Kronberg and Steinbach.",
-     w:"Jobs, tax income, car-owning shoppers",l:"Altstadt shopkeepers, people without cars, fields by the motorway",tags:"Range grows · threshold met by car"},
-  B:{t:"Revive the Altstadt",g:"C3",cost:12,km:4,d:{eco:4,env:3,com:8,con:1},
-     p:"Pedestrianise the old town, open a covered market hall and a culture centre in empty half-timbered buildings.",
-     w:"Local shops, residents, tourists, heritage",l:"Drivers; it mostly serves Oberursel itself, so the sphere stays small",tags:"Local sphere strengthened"},
-  C:{t:"Tech & business campus",g:"E3",cost:15,km:15,d:{eco:12,env:-4,com:0,con:-4},
-     p:"Offer cheap land to tech and finance firms (Frankfurt overflow). Workers would commute IN from Usingen, Friedrichsdorf and Frankfurt.",
-     w:"Jobs, taxes, Oberursel becomes a work destination",l:"Roads and trains busier in both directions, house prices rise",tags:"Employment sphere · reverse commuting"},
-  D:{t:"Regional health centre",g:"D4",cost:16,km:10,d:{eco:5,env:0,com:7,con:2},
-     p:"A specialist clinic with A&E and outpatient care: a high-order service that needs a large threshold population.",
-     w:"Patients across the southern Hochtaunus, ageing residents",l:"Most expensive; Frankfurt's big hospitals still compete",tags:"High-order service · threshold"}
- }
+/* Class ids must match CLASSES in index.html. */
+const CLASSES = {
+  'roberts-1': 'Roberts – Class 1',
+  'roberts-2': 'Roberts – Class 2',
+  'stothard': 'Stothard',
+  'langelueddecke': 'Langelüddecke'
 };
 
-/* Extra decisions inside rounds */
-const SUB={
- aff:{q:"What share of the homes will be affordable?",why:"Cheaper homes for nurses, teachers and young families. Developers make less profit.",opts:{
-   "0":{t:"0% affordable",cost:0,d:{com:-4,eco:2}},"20":{t:"20% affordable",cost:4,d:{com:3}},"40":{t:"40% affordable",cost:8,d:{com:7,eco:-3}}}},
- green:{q:"How much green space on the new estate?",why:"More parks mean fewer homes. More homes mean less space for play, trees and rainwater.",opts:{
-   park:{t:"Large park and play areas",homes:-200,cost:2,d:{env:4,com:3}},
-   std:{t:"Standard gardens",homes:0,cost:0,d:{}},
-   max:{t:"Squeeze in extra homes",homes:200,cost:-2,d:{env:-3,com:-3,eco:2}}}},
- traffic:{q:"What happens to cars in the Altstadt?",why:"Narrow medieval streets, busy shops, and residents who park outside their homes.",opts:{
-   free:{t:"Car-free Altstadt",cost:2,d:{env:4,com:2,eco:-3,con:-1}},
-   limit:{t:"Residents and deliveries only",cost:1,d:{env:2,eco:-1}},
-   open:{t:"Keep it open to cars",cost:0,d:{eco:2,env:-3,com:-1}}}},
- pay:{q:"How will you pay for it?",why:"Raising a tax adds €6m to your budget, but someone pays.",opts:{
-   biz:{t:"Raise local business tax",cost:-6,d:{eco:-4}},
-   home:{t:"Raise household tax",cost:-6,d:{com:-4}},
-   none:{t:"No new taxes",cost:0,d:{}}}},
- land:{q:"Where does the land for your project come from?",why:"Every project needs space. Cheap land is usually green land.",opts:{
-   farm:{t:"Buy farmland on the edge",cost:0,d:{env:-4}},
-   reuse:{t:"Reuse empty buildings",cost:4,d:{env:1,com:1}},
-   park:{t:"Build on part of a town park",cost:-1,d:{com:-4,env:-2}}}}
-};
-const ROUND_SUBS={r1:["aff","green"],r2:["traffic"],en:["pay"],r3:["land"]};
-
-/* A stakeholder demand in every decision round */
-const STAKE={
- r1:{who:"Oberstedten Residents' Association",ask:"“Hold a two-year public consultation before any building starts.”",
-   yes:{t:"Agree to the consultation",cost:2,d:{com:4,eco:-3}},no:{t:"Refuse: homes are needed now",cost:0,d:{com:-4,eco:2}}},
- r2:{who:"Young people from the Taunus villages",ask:"“Run the U3 all night at weekends so we can get home safely.”",
-   yes:{t:"Fund night trains",cost:3,d:{con:3,com:2}},no:{t:"Say no: too expensive",cost:0,d:{com:-2}}},
- en:{who:"Taunus Hiking Club",ask:"“Promise that nothing new will be visible from the Großer Feldberg.”",
-   yes:{t:"Make the promise",cost:0,d:{com:3,env:-3}},no:{t:"Refuse: climate comes first",cost:0,d:{com:-3,env:1}}},
- r3:{who:"Oberursel Youth Council",ask:"“Add a youth centre and skate park to your project.”",
-   yes:{t:"Add the youth centre",cost:3,d:{com:5}},no:{t:"Say no: stick to the plan",cost:0,d:{com:-3}}}
-};
-/* Visitor attractions: range, threshold and competition from Frankfurt */
-const POP={Oberursel:47000,Frankfurt:760000,"Bad Homburg":54000,Kronberg:18000,"Königstein":16000,Steinbach:10000,Eschborn:22000,Friedrichsdorf:25000,Usingen:15000,"Neu-Anspach":15000};
-const ATTR={
- cable:{t:"Cable car up the Großer Feldberg",g:"B2 → off map NW",at:[175,150],cost:14,km:40,thr:500000,competes:false,car:false,d:{eco:6,env:-3,com:2,con:3},
-   p:"A gondola from the U3 terminus at Hohemark to the Feldberg summit (881 m). Day-trippers arrive by train and float over the forest.",w:"Tourism, Hohemark cafés, people who can't hike",l:"Forest along the route, the quiet summit, budget"},
- cinema:{t:"Multiplex cinema",g:"E3",at:[455,240],cost:5,km:8,thr:200000,competes:true,car:true,d:{eco:3,com:3,env:-1},
-   p:"An 8-screen cinema with a big car park at the Drei Hasen site by the A661.",w:"Teenagers and families who now travel to Bad Homburg or Frankfurt",l:"Small local venues; extra evening traffic"},
- club:{t:"Nightclub & live-music hall",g:"B2",at:[207,171],cost:3,km:15,thr:290000,competes:true,car:false,d:{eco:2,com:3},
-   p:"Turn a hall at the old engine works into a club and concert venue.",w:"Young people who now go out in Frankfurt",l:"Neighbours: noise and late-night crowds"},
- food:{t:"Altstadt food hall & star restaurant",g:"C3",at:[248,228],cost:4,km:20,thr:120000,competes:true,car:true,d:{eco:4,com:2},
-   p:"A market hall for Taunus farmers and food stalls, plus a top-chef restaurant in a half-timbered building.",w:"Altstadt traders, local farmers, food lovers",l:"Rents rise for existing cafés"},
- eco:{t:"Taunus eco-tourism",g:"A1",at:[60,45],cost:6,km:50,thr:300000,competes:false,car:false,d:{eco:4,env:2,com:1},
-   p:"A treetop walkway, eco-lodges and guided trails that explain forest dieback and replanting.",w:"Forest education, rural jobs, the climate",l:"Wildlife disturbed by more visitors"},
- bike:{t:"Mountain-bike park & climbing forest",g:"B1",at:[140,85],cost:4,km:25,thr:150000,competes:false,car:true,d:{eco:3,com:2,env:-2},
-   p:"Downhill trails and a ropes course on the slopes above Hohemark.",w:"Teenagers, sporty visitors, bike shops",l:"Trail erosion, walkers"},
- pool:{t:"Leisure pool & sauna",g:"D4",at:[365,345],cost:8,km:12,thr:250000,competes:true,car:true,d:{eco:2,com:4,env:-1},
-   p:"Slides, a wave pool and sauna next to Bommersheim U3 station.",w:"Families, schools, older people",l:"High running costs; Bad Homburg's pools compete"}
-};
-const MAXATTR=2;
-function placeDist(n){const pl=PLACES.find(x=>x[0]===n);return pl?Math.hypot(pl[1],pl[2]):0}
-function attrRange(k,t){const a=ATTR[k];let r=a.km;const why=[];
-  if(t.r2==="A"){r+=3;why.push("U3 upgrade +3 km")}
-  if(t.r2==="C"&&a.car){r+=4;why.push("road upgrade +4 km")}
-  if(k==="club"&&t.s_r2==="yes"){r+=5;why.push("night trains +5 km")}
-  return{r,why}}
-function reach(km,competes){let s=0;for(const n in POP){if(placeDist(n)<=km)s+=(n==="Frankfurt"&&competes)?POP[n]*0.1:POP[n]}return Math.round(s)}
-function attrOutcome(k,t){const a=ATTR[k];const{r,why}=attrRange(k,t);const people=reach(r,a.competes);return{range:r,why,people,ok:people>=a.thr}}
-const attrRevealed=()=>RI(G.round)>RI("r3");
-const fmt=n=>n.toLocaleString("en");
-
-/* Teams that promised the hikers but built turbines lose part of the benefit */
-const CLASH=t=>t.en==="A"&&t.s_en==="yes"?{d:{env:-4,com:-4},n:"You promised the hikers nothing visible from the Feldberg, then built turbines there."}:null;
-
-const EVENTS=[
- {id:"flood",t:"Flash flood on the Urselbach",p:"A summer storm drops 60 mm of rain in two hours. The Urselbach bursts its banks in Bommersheim; cellars and the U3 track flood.",
-  base:{env:-3},cond:t=>t.r1==="D"?{d:{env:-5},n:"You cleared forest upstream at Hohemark, so rain runs off faster."}:t.green==="max"?{d:{com:-3},n:"You squeezed in extra homes and paved over space for rainwater."}:t.green==="park"?{d:{com:2},n:"Your parks soak up some of the rain."}:null,
-  a:{t:"Natural flood management: wetlands, rain gardens, re-meandering",cost:6,d:{env:6,com:1}},
-  b:{t:"Concrete channel and higher walls",cost:3,d:{env:-4,com:2}}},
- {id:"beetle",t:"Bark beetle hits the Taunus",p:"After three dry summers, spruce trees above Oberursel are dying. Hiking trails close and slopes are at risk of erosion.",
-  base:{env:-4},cond:t=>t.en==="C"?{d:{eco:4},n:"The dead wood becomes cheap fuel for your heating plant."}:t.r1==="D"?{d:{com:-3},n:"Your new villas sit right at the dying forest edge."}:null,
-  a:{t:"Replant mixed native forest (beech, oak)",cost:5,d:{env:8,com:1}},
-  b:{t:"Sell the timber and clear the slopes",cost:0,d:{eco:4,env:-6}}},
- {id:"squeeze",t:"Frankfurt housing squeeze",p:"Rents in Frankfurt jump 15%. 1,000 more families want to move out to Oberursel and commute back.",
-  base:{con:-2},cond:t=>t.aff==="40"?{d:{com:3},n:"Your 40% affordable homes ease the pressure."}:t.aff==="0"?{d:{com:-3},n:"You built no affordable homes, so locals are priced out."}:null,
-  a:{t:"Welcome them: zone extra land for homes",cost:2,d:{eco:5,com:-2,con:-4,env:-3}},
-  b:{t:"Refuse: protect green space and character",cost:0,d:{com:2,eco:-3}}},
- {id:"hq",t:"A company wants to move its HQ here",p:"A large firm offers 2,000 jobs if it gets a 10-hectare site by the A661.",
-  base:{},cond:t=>t.r2==="C"?{d:{eco:3},n:"Your road upgrade makes the site more attractive."}:t.pay==="biz"?{d:{eco:-3},n:"Your higher business tax makes them hesitate."}:null,
-  a:{t:"Say yes and give them farmland by the motorway",cost:0,d:{eco:10,env:-6,con:-4}},
-  b:{t:"Offer the Drei Hasen brownfield instead (slower, costly)",cost:5,d:{eco:4,env:1}}},
- {id:"shops",t:"Altstadt shops close",p:"Online shopping bites. Eight shops in the Altstadt close in one year and the Saturday market is shrinking.",
-  base:{eco:-3,com:-2},cond:t=>t.r3==="A"?{d:{com:-5},n:"Your retail park pulls even more trade away."}:t.r3==="B"?{d:{com:3},n:"Your Altstadt revival softens the blow."}:t.traffic==="free"?{d:{eco:-2},n:"Shopkeepers blame your car-free Altstadt."}:null,
-  a:{t:"Subsidise rents for independent shops and cafés",cost:4,d:{com:5,eco:2}},
-  b:{t:"Allow empty shops to become flats",cost:0,d:{eco:-1,com:-1,con:1}}},
- {id:"heat",t:"Heatwave: 38 °C",p:"Two weeks above 35 °C. Dense, paved areas are 5 °C hotter than the forest edge (urban heat island).",
-  base:{com:-2},cond:t=>t.r1==="C"?{d:{com:-4},n:"Your high-density blocks trap heat."}:t.green==="park"?{d:{com:2},n:"Your parks and trees cool the new estate."}:null,
-  a:{t:"Green roofs, street trees, public water fountains",cost:5,d:{env:5,com:3}},
-  b:{t:"Do nothing: air-conditioning is people's own choice",cost:0,d:{com:-4,env:-2}}},
- {id:"energy",t:"Energy prices double",p:"A crisis in the gas market doubles heating and electricity bills overnight.",
-  base:{com:-3},cond:t=>t.en==="D"?{d:{eco:-4,com:-2},n:"You rely on bought-in power, so bills hit hard."}:t.en==="B"?{d:{com:3},n:"Rooftop solar protects households."}:t.en==="C"?{d:{com:2},n:"Your local heating plant keeps prices stable."}:null,
-  a:{t:"Emergency payments for poorer households",cost:4,d:{com:5}},
-  b:{t:"Let the market sort it out",cost:0,d:{com:-3,eco:1}}},
- {id:"rail",t:"S5 and U3 closed for repairs",p:"Both rail lines into Frankfurt close for six months of track renewal. Replacement buses only.",
-  base:{con:-3},cond:t=>t.r2==="A"?{d:{con:-5},n:"Your transport plan depended on the U3."}:t.r2==="C"?{d:{con:2},n:"Your road capacity copes better."}:t.r2==="B"?{d:{con:2},n:"Your cycle superhighway gives commuters another way in."}:null,
-  a:{t:"Run express buses via the A661 to Frankfurt",cost:3,d:{con:4,env:-1}},
-  b:{t:"Encourage working from home and cycling",cost:0,d:{eco:-2,env:2}}}
-];
-const PITCH=[["Vision","Clear picture of Oberursel in 2050"],["Geography","Uses site, situation, sphere of influence, hierarchy accurately"],["Evidence","Grid references, map features or scores"],["Trade-offs","Names who loses and why it is still right"]];
-const STARTERS={
- r1:"I chose site __ (grid __) because its site/situation… I chose __% affordable and __ green space because… On the residents' demand I decided __ because… The people who lose out are…",
- r2:"I chose __ because people living at my new homes in __ need to… For the Altstadt I decided __ because… On the night trains I said __ because…",
- en:"I chose __ because… I will pay for it by __, which affects… On the hikers' demand I decided __ because…",
- ev:"My earlier decision to __ made this event better/worse because… I chose response __ because…",
- r3:"I chose __ because it would change Oberursel's sphere of influence by… For attractions I chose __ because its threshold of __ is met: within __ km there are about __ people… It would compete with Frankfurt/Bad Homburg because… The land comes from __ because…",
- ev2:"This hit my town harder/softer because earlier I chose… I responded with __ because…",
- pitch:"By 2050 Oberursel will be… My key decisions were… The hardest trade-off was… because…"
-};
-
-/* ================= state ================= */
-let me=null,isGM=false,LOCAL=false,KEY=null,STUDENT_URL="",CLS=null,pollTimer=null;
-/* Classes: ids must match CLASSES in apps-script/Code.gs */
-const CLASSES=[
- {id:"roberts-1",name:"Roberts – Class 1",teacher:"Roberts"},
- {id:"roberts-2",name:"Roberts – Class 2",teacher:"Roberts"},
- {id:"stothard",name:"Stothard",teacher:"Stothard"},
- {id:"langelueddecke",name:"Langelüddecke",teacher:"Langelüddecke"}
-];
-const className=id=>(CLASSES.find(c=>c.id===id)||{}).name||"";
-const URL_CLASS=(()=>{const c=new URLSearchParams(location.search).get("class");return CLASSES.some(x=>x.id===c)?c:null})();
-/* ===== SETUP: paste your Apps Script web app link between the quotes (see README) ===== */
-const API_URL="https://script.google.com/a/macros/fis.edu/s/AKfycbyPb-akmJa4XZK04Sum2we0LSrZKIrOpwq7w1m52TA-A9O0GKL7EMwAJKwpGTgA_1Cv/exec";
-/* ======================================================================================= */
-const MODE=new URLSearchParams(location.search).has("teacher")?"teacher":"student";
-const CONFIGURED=/^https:\/\/script\.google(usercontent)?\.com\//.test(API_URL);
-function api(fn,...args){
-  return fetch(API_URL,{method:"POST",body:JSON.stringify({fn,args})})
-    .then(r=>r.json()).then(j=>{if(!j.ok)throw new Error(j.error||"Request failed");return j.result});
+/* ---------- web app ---------- */
+/** Opens the game. Students: the /exec link (add ?class=...). Teachers: add ?teacher=1. */
+function doGet(e) {
+  const p = (e && e.parameter) || {};
+  const t = HtmlService.createTemplateFromFile('Index');
+  t.settings = JSON.stringify({
+    teacher: !!p.teacher,
+    cls: CLASSES[p['class']] ? p['class'] : null,
+    base: ScriptApp.getService().getUrl()
+  });
+  return t.evaluate()
+    .setTitle('Oberursel 2050')
+    .addMetaTag('viewport', 'width=device-width, initial-scale=1')
+    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }
-let G={round:"r0",event:null,event2:null,timerEnd:null};
-const P={}, M={};
-const ui={preview:false,mapView:"town",layers:{forest:1,river:1,rail:1,road:1,sites:1,grid:1},activeQ:null,hl:null,pick:null,sphereFor:null,drafts:{},msg:{},quizDraft:{},confirmReset:false};
-const LKEY="oberursel2050-solo";
-
-const $=s=>document.querySelector(s);
-const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
-const words=s=>(s||"").trim().split(/\s+/).filter(Boolean).length;
-const color=v=>v>=60?"var(--good)":v>=35?"var(--warn)":"var(--bad)";
-const myDoc=()=>P[me]||null;
-const gmView=()=>isGM&&!ui.preview;
-const evOf=rid=>{const id=rid==="ev"?G.event:G.event2;return id?EVENTS.find(x=>x.id===id):null};
-
-const chains={};
-function queue(path,fn){chains[path]=(chains[path]||Promise.resolve()).then(fn,fn);return chains[path]}
-function write(path,data){const[col,id]=path.split("/");
-  if(col==="players")return queue(path,()=>api("savePlayer",id,Object.assign({},data,{cls:CLS})));
-  if(col==="game")return queue(path,()=>api("setGame",KEY,CLS,data));
-  if(col==="marks")return queue(path,()=>api("setMark",KEY,id,data));
-  return Promise.resolve()}
-function saveLocal(){try{localStorage.setItem(LKEY,JSON.stringify({G,me:P[me]}))}catch(e){}}
-
-/* ================= scoring ================= */
-function add(ind,d){for(const k in d)ind[k]+=d[k]}
-function quizScore(p){if(!p||!p.quiz)return 0;return QUIZ.filter(q=>q.type==="grid"?String(p.quiz[q.id]||"").toUpperCase().trim()===q.a:p.quiz[q.id]===q.a).length}
-function compute(p,m){
-  const t=p||{};m=m||{};const j=m.j||{};
-  const ind={eco:50,env:50,com:50,con:50};let cost=0,homes=0;const notes=[];
-  const take=o=>{if(!o)return;add(ind,o.d||{});cost+=o.cost||0};
-  for(const rid of["r1","r2","en","r3"]){
-    take(t[rid]&&OPT[rid][t[rid]]);
-    (ROUND_SUBS[rid]||[]).forEach(s=>take(t[s]!=null&&SUB[s].opts[t[s]]));
-    const sv=t["s_"+rid];take(sv&&STAKE[rid][sv]);
+function doPost(e) {
+  try {
+    const req = JSON.parse(e.postData.contents);
+    const actions = { checkKey: checkKey, getState: getState, savePlayer: savePlayer, setGame: setGame,
+                      setMark: setMark, kick: kick, resetAll: resetAll, saveResults: saveResults };
+    const fn = actions[req.fn];
+    if (!fn) throw new Error('Unknown action.');
+    return json_({ ok: true, result: fn.apply(null, req.args || []) });
+  } catch (err) {
+    return json_({ ok: false, error: String((err && err.message) || err) });
   }
-  if(t.r1){homes=OPT.r1[t.r1].homes+((t.green&&SUB.green.opts[t.green].homes)||0)}
-  (t.attr||[]).forEach(k=>{const a=ATTR[k];if(!a)return;cost+=a.cost;
-    if(attrRevealed()){const o=attrOutcome(k,t);if(o.ok)add(ind,a.d);else{add(ind,{eco:-4,com:-1});notes.push(`Your ${a.t.toLowerCase()} closed: only ${fmt(o.people)} people in range, it needed ${fmt(a.thr)}.`)}}});
-  const clash=CLASH(t);if(clash){add(ind,clash.d);notes.push(clash.n)}
-  for(const rid of["ev","ev2"]){const e=evOf(rid);if(!e||RI(G.round)<RI(rid))continue;
-    add(ind,e.base);const c=e.cond(t);if(c){add(ind,c.d);notes.push(c.n)}
-    const r=t[rid];if(r&&e[r])take(e[r])}
-  for(const k in ind)ind[k]=Math.max(0,Math.min(100,ind[k]));
-  const si=(ind.eco+ind.env+ind.com+ind.con)/4;
-  const weak=IND.filter(([k])=>ind[k]<35).length;
-  const budget=BUDGET-cost;
-  const shortfall=t.r1?Math.max(0,TARGET-homes):0;
-  const penalty=-5*weak+Math.min(0,budget)-Math.ceil(shortfall/100);
-  const just=MARKED.reduce((a,k)=>a+(j[k]||0),0);
-  const pitch=(m.pitch||[]).reduce((a,b)=>a+(b||0),0);
-  const quiz=quizScore(t);
-  const total=Math.round(si+penalty+just*1.5+pitch+quiz);
-  return{ind,si,cost,budget,homes,shortfall,weak,penalty,just,pitch,quiz,total,notes};
 }
-function ranked(){return Object.keys(P).map(id=>({id,p:P[id],c:compute(P[id],M[id])})).sort((a,b)=>b.c.total-a.c.total)}
-function choiceSummary(p,rid){
-  if(!p)return"–";
-  if(rid==="ev"||rid==="ev2")return p[rid]||"–";
-  const parts=[p[rid]||"–"];
-  if(rid==="r3")parts.push((p.attr&&p.attr.length)?p.attr.map(k=>k+(gmView()||attrRevealed()?(attrOutcome(k,p).ok?"✓":"✗"):"")).join("+"):"no attractions");
-  (ROUND_SUBS[rid]||[]).forEach(s=>parts.push(p[s]!=null?(s==="aff"?p[s]+"%":p[s]):"–"));
-  if(STAKE[rid])parts.push(p["s_"+rid]||"–");return parts.join(" · ");
-}
-function shortPath(p){return["r1","r2","en","r3"].map(k=>(p&&p[k])||"–").join("")}
-
-/* ================= shared pieces ================= */
-function deltas(d,cost){let h="";for(const[k,n]of IND)if(d&&d[k])h+=`<span class="d ${d[k]>0?"p":"n"}">${n.slice(0,3)} ${d[k]>0?"+":""}${d[k]}</span>`;
-  if(cost)h+=`<span class="d">${cost<0?"+€"+(-cost)+"m budget":"€"+cost+"m"}</span>`;return h?`<div class="deltas">${h}</div>`:""}
-function seg(vals,cur,attr){return`<span class="seg">${vals.map(v=>`<button data-${attr}="${v}" aria-pressed="${String(cur)===String(v)}">${v}</button>`).join("")}</span>`}
-function head(r,title){return`<div class="stage-head"><div><span class="label">Lesson ${r.lesson} · Round ${RI(r.id)+1} of ${ROUNDS.length}</span><h2>${title}</h2></div><span class="when">${r.when}</span></div>`}
-function el(tag,canPick,attr){return canPick?["button",attr]:["article",""]}
-function optionCards(key,chosen,canPick){
-  return`<div class="opts">${Object.entries(OPT[key]).map(([L,x])=>{const[tg,at]=el("",canPick,`data-pick="${key}:${L}"`);return`
-    <${tg} class="opt" ${at} ${!canPick&&key==="r1"?`data-hl="r1:${L}"`:""} aria-pressed="${chosen===L}">
-      <div class="opt-top"><span class="letter">${L}</span><div><h3>${x.t}</h3><span class="grid-ref">Grid ${x.g} · ${x.tags}</span></div></div>
-      <p>${x.p}</p>
-      <div class="wl"><div class="w"><b>Winners</b><br>${x.w}</div><div class="lo"><b>Losers</b><br>${x.l}</div></div>
-      <div class="meta"><span>Cost €${x.cost}m</span>${x.homes?`<span>${x.homes.toLocaleString("en")} homes</span>`:""}${x.km?`<span>Range ≈ ${x.km} km</span>`:""}</div>
-      ${deltas(x.d)}
-    </${tg}>`}).join("")}</div>`;
-}
-function subBlock(s,n,chosen,canPick){
-  const S=SUB[s];
-  return`<section class="decision"><h3><span class="n">DECISION ${n}</span>${S.q}</h3><p>${S.why}</p><div class="opts three">${Object.entries(S.opts).map(([k,o])=>{const[tg,at]=el("",canPick,`data-sub="${s}:${k}"`);
-    return`<${tg} class="opt sm" ${at} aria-pressed="${String(chosen)===k}"><h3>${o.t}</h3>${o.homes?`<span class="grid-ref">${o.homes>0?"+":""}${o.homes} homes</span>`:""}${deltas(o.d,o.cost)}</${tg}>`}).join("")}</div></section>`;
-}
-function stakeBlock(rid,n,chosen,canPick){
-  const S=STAKE[rid];
-  return`<section class="decision"><h3><span class="n">DECISION ${n}</span>A stakeholder writes to you</h3>
-   <div class="letter-card"><span class="from">From: ${S.who}</span><blockquote>${S.ask}</blockquote>
-   <div class="opts">${["yes","no"].map(k=>{const o=S[k];const[tg,at]=el("",canPick,`data-stake="${rid}:${k}"`);
-     return`<${tg} class="opt sm" ${at} aria-pressed="${chosen===k}"><h3>${o.t}</h3>${deltas(o.d,o.cost)}</${tg}>`}).join("")}</div></div></section>`;
+function json_(obj) {
+  return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(ContentService.MimeType.JSON);
 }
 
-function attrBlock(n,chosen,canPick,p){
-  const rev=attrRevealed()||gmView();
-  const rows=Object.keys(POP).map(nm=>[nm,placeDist(nm),POP[nm]]).sort((a,b)=>a[1]-b[1]);
-  return`<section class="decision"><h3><span class="n">DECISION ${n}</span>Visitor attractions: choose up to ${MAXATTR}</h3>
-   <p>Each attraction pulls visitors from a certain distance (its <b>range</b>) and needs enough people living within that range to survive (its <b>threshold</b>). Frankfurt already has cinemas, clubs, pools and restaurants, so where your range reaches Frankfurt only 1 in 10 Frankfurters will come for something they already have. Check each threshold with the table and the Region map before you choose. Attractions that fail close down (Economy −4, Community −1, and you lose the money). Results are revealed when the round closes.</p>
-   <div class="opts three">${Object.entries(ATTR).map(([k,a])=>{const on=chosen.includes(k);const[tg,at]=el("",canPick,`data-attr="${k}"`);
-     const o=p&&on&&rev?attrOutcome(k,p):null;
-     return`<${tg} class="opt sm" ${at} aria-pressed="${on}"><h3>${a.t}</h3><span class="grid-ref">Grid ${a.g}${a.competes?" · Frankfurt competes":" · unique in the region"}</span><p>${a.p}</p>
-       <div class="wl"><div class="w"><b>Winners</b><br>${a.w}</div><div class="lo"><b>Losers</b><br>${a.l}</div></div>
-       <div class="meta"><span>Range ${a.km} km</span><span>Threshold ${fmt(a.thr)} people</span><span>€${a.cost}m</span></div>${deltas(a.d)}
-       ${o?`<span class="mark ${o.ok?"y":"n"}">${o.ok?"✓ Thrives":"✗ Closes"}: ${fmt(o.people)} people within ${o.range} km${o.why.length?" ("+o.why.join(", ")+")":""}</span>`:""}</${tg}>`}).join("")}</div>
-   <div class="tablewrap" style="margin-top:12px"><table><thead><tr><th>Town</th><th>Distance from Oberursel</th><th>Population (approx.)</th></tr></thead>
-   <tbody>${rows.map(([nm,dd,pp])=>`<tr><td>${nm}</td><td class="mono">${dd.toFixed(1)} km</td><td class="mono">${fmt(pp)}${nm==="Frankfurt"?" (counts 10% for things Frankfurt already has)":""}</td></tr>`).join("")}</tbody></table></div>
-   <p class="hint">Your earlier transport decisions can stretch a range: the U3 upgrade adds 3 km to every attraction, the A661 road upgrade adds 4 km to attractions people drive to, and night U3 trains add 5 km to the nightclub.</p></section>`;
-}
-
-/* ================= student stage ================= */
-function canEditRound(id){return LOCAL||G.round===id}
-const has=(p,k)=>k==="attr"?!!(p.attr&&p.attr.length):p[k]!=null;
-function needs(rid){const L=[[rid,"Main choice"]];if(rid==="r3")L.push(["attr","Attractions"]);(ROUND_SUBS[rid]||[]).forEach(s=>L.push([s,SUB[s].q.replace(/\?$/,"")]));if(STAKE[rid])L.push(["s_"+rid,"Stakeholder"]);return L}
-function answerBox(id,label){
-  const p=myDoc()||{};const saved=(p.why||{})[id]||"";const v=ui.drafts[id]??saved;const open=canEditRound(id);const msg=ui.msg[id];
-  if(!open)return`<div class="answer"><label>${label}</label>${saved?`<div class="locked-note">${esc(saved)}</div>`:`<div class="locked-note muted">No justification submitted.</div>`}<span class="hint">This round is closed.</span></div>`;
-  const list=(ROUND_SUBS[id]||STAKE[id])?needs(id):[];
-  return`<div class="answer"><label for="why-${id}">${label}</label>
-    ${list.length?`<div class="checklist">${list.map(([k,n])=>`<span class="${has(p,k)?"ok":""}">${has(p,k)?"✓":"○"} ${n}</span>`).join("")}</div>`:""}
-    <textarea id="why-${id}" data-why="${id}" placeholder="${esc(STARTERS[id])}">${esc(v)}</textarea>
-    <div class="row"><button class="btn primary big" data-submit="${id}">Lock in my decisions</button>
-    <span class="wc" id="wc-${id}">${words(v)} words (min ${MINWORDS})</span>
-    <span class="status ${msg&&msg.ok?"ok":msg?"err":""}">${msg?esc(msg.t):saved?"Saved. You can change it until the round closes.":""}</span></div></div>`;
-}
-function decisionRound(rid,title,brief,extra){
-  const r=ROUNDS[RI(rid)];const p=myDoc()||{};const open=canEditRound(rid);let n=1;
-  let h=head(r,title)+`<p class="brief">${brief}</p>${extra||""}
-   <section class="decision"><h3><span class="n">DECISION ${n++}</span>${{r1:"Choose a site",r2:"Choose a transport investment",en:"Choose an energy source",r3:"Choose a flagship project"}[rid]}</h3></section>${optionCards(rid,p[rid],open)}`;
-  if(rid==="r3")h+=attrBlock(n++,p.attr||[],open,p);
-  (ROUND_SUBS[rid]||[]).forEach(s=>h+=subBlock(s,n++,p[s],open));
-  if(STAKE[rid])h+=stakeBlock(rid,n++,p["s_"+rid],open);
-  return h+answerBox(rid,"Justify your decisions");
-}
-function eventRound(rid){
-  const r=ROUNDS[RI(rid)];const e=evOf(rid);const p=myDoc()||{};const open=canEditRound(rid);
-  if(!e)return head(r,r.title)+`<p class="brief">Waiting for the game master to draw an event card…</p>`;
-  const c=e.cond(p);
-  return head(r,r.title)+`<div class="event-card"><span class="tag">Event card</span><h3>${e.t}</h3><p>${e.p}</p>${deltas(e.base)}
-    ${c?`<p class="hitnote">Your town: ${esc(c.n)}</p>${deltas(c.d)}`:`<p class="hint">Your earlier decisions don't change the impact.</p>`}</div>
-    <section class="decision"><h3><span class="n">DECISION</span>How do you respond?</h3></section>
-    <div class="opts">${["a","b"].map(k=>{const[tg,at]=el("",open,`data-pick="${rid}:${k}"`);return`<${tg} class="opt" ${at} aria-pressed="${p[rid]===k}"><div class="opt-top"><span class="letter">${k}</span><div><h3>${e[k].t}</h3></div></div>${deltas(e[k].d,e[k].cost)}</${tg}>`}).join("")}</div>
-    ${answerBox(rid,"How did your earlier decisions affect this, and why this response?")}`;
-}
-function renderStudentStage(){
-  const r=ROUNDS[RI(G.round)];const p=myDoc()||{};let h="";
-  if(r.id==="r0"){
-    const done=!canEditRound("r0");const qd=Object.assign({},p.quiz||{},ui.quizDraft);const showMarks=RI(G.round)>0;
-    h=head(r,"Know your town")+`
-    <p class="brief">You are a planner advising Oberursel's council. Before you change the town you need to know where it is and how it works. For grid questions, press “Answer on map”, then click the map.</p>
-    <div class="facts"><div class="fact"><b class="mono">46,757</b><span>residents (end 2025)</span></div><div class="fact"><b>45 km²</b><span>area, much of it Taunus forest</span></div><div class="fact"><b>~197 m</b><span>altitude of the centre</span></div><div class="fact"><b>~16 km</b><span>to central Frankfurt</span></div></div>
-    <span class="label">Concepts you will need</span>
-    <div class="chips"><span class="chip"><b>Site</b>: the land the town is built on</span><span class="chip"><b>Situation</b>: location relative to other places</span><span class="chip"><b>Sphere of influence</b>: area served by its services</span><span class="chip"><b>Settlement hierarchy</b></span><span class="chip"><b>Threshold</b> &amp; <b>range</b></span><span class="chip"><b>Commuter settlement</b></span><span class="chip"><b>Greenfield</b> / <b>brownfield</b></span><span class="chip"><b>Rural–urban fringe</b></span><span class="chip"><b>Stakeholder</b></span></div>
-    <span class="label">Map quiz · 1 point each</span>
-    <div class="quiz">${QUIZ.map((q,i)=>{const v=qd[q.id];const right=q.type==="grid"?String(v||"").toUpperCase()===q.a:v===q.a;
-      return`<div class="qrow ${ui.activeQ===q.id?"active":""}"><span class="num">${i+1}</span><div>${q.q}
-      ${showMarks&&v!=null&&v!==""?` <span class="mark ${right?"y":"n"}">${right?"✓ correct":"✗ answer: "+(q.type==="grid"?q.a:q.opts[q.a])}</span>`:""}
-      <div class="ctl">${q.type==="grid"?`<input class="gridin" id="gi-${q.id}" data-grid="${q.id}" maxlength="2" value="${esc(v||"")}" ${done?"disabled":""} aria-label="Grid square answer"><button class="btn small ${ui.activeQ===q.id?"on":""}" data-activeq="${q.id}" ${done?"disabled":""}>${ui.activeQ===q.id?"Now click the map":"Answer on map"}</button>`
-      :q.opts.map((o,k)=>`<button class="mc" data-mc="${q.id}:${k}" aria-pressed="${v===k}" ${done?"disabled":""}>${o}</button>`).join("")}</div></div></div>`}).join("")}</div>
-    ${done?`<p class="hint">Quiz closed. You scored ${quizScore(p)} / ${QUIZ.length}.</p>`:`<div class="answer"><div class="row"><button class="btn primary big" data-submitquiz>Submit my answers</button><span class="status ${ui.msg.r0&&ui.msg.r0.ok?"ok":ui.msg.r0?"err":""}">${ui.msg.r0?esc(ui.msg.r0.t):p.quiz?"Saved. You can change answers until the round closes.":""}</span></div></div>`}`;
+/* ---------- storage helpers ---------- */
+const PLAYER_HEADERS = ['id', 'name', 'class', 'last saved', 'homes', 'transport', 'energy', 'project', 'attractions', 'data (do not edit)'];
+const DATA_COL = 10;
+function ss_() { return SpreadsheetApp.getActiveSpreadsheet(); }
+function sheet_(name, headers) {
+  let sh = ss_().getSheetByName(name);
+  if (!sh) {
+    sh = ss_().insertSheet(name);
+    sh.appendRow(headers);
+    sh.setFrozenRows(1);
+    sh.getRange(1, 1, 1, headers.length).setFontWeight('bold');
   }
-  if(r.id==="r1")h=decisionRound("r1","Where do 1,500 homes go?",`The region is short of housing: Oberursel must build ${TARGET.toLocaleString("en")} new homes. Make <b>four decisions</b>. Find each site on the map first. You have €${BUDGET}m for the whole game, and each 100 homes short of the target costs 1 point.`);
-  if(r.id==="r2")h=decisionRound("r2","Moving people","Every morning thousands leave Oberursel for Frankfurt and traffic backs up from the A661. Make <b>three decisions</b>. How will people at your new homes get around?");
-  if(r.id==="en")h=decisionRound("en","Power the town","Oberursel has promised to be climate-neutral by 2045. Make <b>three decisions</b>. Every energy source changes the landscape, the budget or both.");
-  if(r.id==="ev"||r.id==="ev2")h=eventRound(r.id);
-  if(r.id==="r3")h=decisionRound("r3","Raise Oberursel's status?","Oberursel sits in Frankfurt's shadow. The council wants a bigger <b>sphere of influence</b>. Make <b>three decisions</b>, then open the Region map to see your new sphere and where it overlaps with Frankfurt's and Bad Homburg's.",
-    `<div class="chips"><span class="chip"><b>Range</b>: furthest distance people travel for a service</span><span class="chip"><b>Threshold</b>: minimum population to keep it open</span><span class="chip"><b>Low-order</b> vs <b>high-order</b> services</span></div>`);
-  if(r.id==="pitch")h=head(r,"Your pitch to the council")+`<p class="brief">Write your final pitch for Oberursel 2050. The game master scores it on four criteria, 2 points each.</p><div class="rubric">${PITCH.map(([a,b])=>`<div><b>${a}</b>${b}</div>`).join("")}</div>${answerBox("pitch","My plan for Oberursel 2050")}`;
-  if(r.id==="results")h=resultsHTML();
-  $("#stage").innerHTML=h;
+  return sh;
 }
-function resultsHTML(){
-  const rk=ranked();
-  return head(ROUNDS[RI("results")],"Results")+`<div class="tablewrap results"><table>
-    <thead><tr><th>#</th><th>Planner</th><th class="num">Eco</th><th class="num">Env</th><th class="num">Com</th><th class="num">Con</th><th class="num">Avg</th><th class="num">Penalties</th><th class="num">Quiz</th><th class="num">Justif. ×1.5</th><th class="num">Pitch</th><th class="num">Total</th></tr></thead>
-    <tbody>${rk.map((x,k)=>`<tr ${x.id===me?'style="background:var(--accent-soft)"':""}><td class="mono">${k+1}</td><td><b>${esc(x.p.name)}</b><br><span class="mono" style="font-size:12px;color:var(--muted)">Homes ${x.p.r1||"–"} · Transport ${x.p.r2||"–"} · Energy ${x.p.en||"–"} · Project ${x.p.r3||"–"}</span></td>
-    ${IND.map(([q])=>`<td class="num" style="color:${color(x.c.ind[q])}">${x.c.ind[q]}</td>`).join("")}
-    <td class="num">${x.c.si.toFixed(1)}</td><td class="num" style="color:${x.c.penalty<0?"var(--bad)":"inherit"}">${x.c.penalty}</td><td class="num">${x.c.quiz}</td><td class="num">${(x.c.just*1.5).toFixed(1)}</td><td class="num">${x.c.pitch}</td><td class="num"><b>${x.c.total}</b></td></tr>`).join("")}</tbody></table></div>
-    <p class="hint">Total = average of the four scores − 5 for each score below 35 − 1 per €1m overspent − 1 per 100 homes short + quiz points + justification marks × 1.5 + pitch marks.</p>
-    <span class="label">Debrief</span>
-    <ol style="margin-top:6px"><li>Which decision was hardest? Why could no option satisfy everyone?</li><li>Did anyone score well on Economy and Environment at the same time? How?</li><li>Which stakeholder did you let down, and was that fair?</li><li>Why did some attractions close? What does this show about threshold, range and Frankfurt's sphere of influence?</li><li>Is it fair that Oberursel builds homes for people who work in Frankfurt?</li><li>Exit ticket: “The most sustainable future for Oberursel is… because…” (use two key terms).</li></ol>`;
+function players_() { return sheet_('Players', PLAYER_HEADERS); }
+function marks_() { return sheet_('Marks', ['id', 'name', 'class', 'data (do not edit)']); }
+function game_() { return sheet_('Game', ['class', 'state']); }
+function isTeacher_(key) { return typeof key === 'string' && key.length > 0 && key === TEACHER_PASSWORD; }
+function requireTeacher_(key) { if (!isTeacher_(key)) throw new Error('Teacher password needed.'); }
+function requireClass_(cls) { if (!CLASSES[cls]) throw new Error('Unknown class.'); }
+function cache_() { return CacheService.getScriptCache(); }
+function clearCache_() { cache_().remove('state'); }
+function withLock_(fn) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try { const r = fn(); clearCache_(); return r; } finally { lock.releaseLock(); }
 }
-
-/* ================= teacher stage + desk ================= */
-function gmDecisionPreview(rid){
-  let h=optionCards(rid,null,false);let n=2;
-  if(rid==="r3")h+=attrBlock(n++,[],false,null)+`<p class="hint gm"><b>Answer key</b> (before transport bonuses): ${Object.entries(ATTR).map(([k,a])=>`${a.t} ${attrOutcome(k,{}).ok?"✓":"✗"} (${fmt(attrOutcome(k,{}).people)} / ${fmt(a.thr)})`).join(" · ")}</p>`;
-  (ROUND_SUBS[rid]||[]).forEach(s=>h+=subBlock(s,n++,null,false));
-  if(STAKE[rid])h+=stakeBlock(rid,n++,null,false);return h;
+function rowIndexById_(sh, id) {
+  const last = sh.getLastRow();
+  if (last < 2) return -1;
+  const ids = sh.getRange(2, 1, last - 1, 1).getValues();
+  for (let i = 0; i < ids.length; i++) if (String(ids[i][0]) === id) return i + 2;
+  return -1;
 }
-function renderGMStage(){
-  const r=ROUNDS[RI(G.round)];let h="";
-  if(r.id==="r0")h=head(r,"Map quiz")+`<p class="brief">Students answer six auto-marked map questions on their own devices: three grid references and three on site, situation and hierarchy. Answers and marks show to students when you open the next round.</p><ol>${QUIZ.map(q=>`<li>${q.q} <b class="mono">${q.type==="grid"?q.a:q.opts[q.a]}</b></li>`).join("")}</ol>`;
-  if(r.id==="r1")h=head(r,"Where do 1,500 homes go?")+`<p class="brief">Four decisions: site, affordable share, green space, and a residents' demand. Students justify all of them in one answer (min ${MINWORDS} words).</p>`+gmDecisionPreview("r1");
-  if(r.id==="r2")h=head(r,"Moving people")+gmDecisionPreview("r2");
-  if(r.id==="en")h=head(r,"Power the town")+`<p class="brief">Watch for students who build turbines (A) and also promise the hikers nothing visible from the Feldberg: the contradiction costs them later.</p>`+gmDecisionPreview("en");
-  if(r.id==="ev"||r.id==="ev2"){const e=evOf(r.id);
-    h=head(r,r.title)+(e?`<div class="event-card"><span class="tag">Event card</span><h3>${e.t}</h3><p>${e.p}</p>${deltas(e.base)}</div><div class="opts">${["a","b"].map(k=>`<article class="opt"><div class="opt-top"><span class="letter">${k}</span><div><h3>${e[k].t}</h3></div></div>${deltas(e[k].d,e[k].cost)}</article>`).join("")}</div>`
-    :`<p class="brief">Draw an event card in the marking desk below. Every student sees it, and their earlier decisions decide how hard it hits them.</p>`)}
-  if(r.id==="r3")h=head(r,"Raise Oberursel's status?")+gmDecisionPreview("r3");
-  if(r.id==="pitch")h=head(r,"Final pitches")+`<p class="brief">Students write a pitch for Oberursel 2050. Score each on four criteria below, or ask two or three to read theirs aloud.</p><div class="rubric">${PITCH.map(([a,b])=>`<div><b>${a}</b>${b}</div>`).join("")}</div>`;
-  if(r.id==="results")h=resultsHTML();
-  $("#stage").innerHTML=h;
-}
-function rubric(){return`<div class="rubric"><div><b>0</b>No reason, or not geographical</div><div><b>1</b>Clear reason linked to the choices</div><div><b>2</b>Key terms (site, situation, sphere…) plus map evidence or grid refs</div><div><b>3</b>Also weighs the trade-offs: who wins, who loses, why it is still right</div></div>`}
-function submitted(p,r){if(!p)return false;if(r==="r0")return!!p.quiz;if(r==="pitch")return!!(p.why||{}).pitch;if(r==="results")return true;return!!p[r]&&!!(p.why||{})[r]}
-function kick(id){return`<button class="btn small" data-kick="${id}" title="Remove this player">Remove</button>`}
-function renderDesk(){
-  const box=$("#gm");if(!box||!gmView())return;
-  const ids=Object.keys(P).sort((a,b)=>String(P[a].name).localeCompare(String(P[b].name)));const r=G.round;
-  let h=(STUDENT_URL?`<p class="hint" style="margin:0 0 10px">Student link for ${esc(className(CLS))}: <span class="mono" style="user-select:all;overflow-wrap:anywhere">${esc(STUDENT_URL)}</span></p>`:"")+`<div class="gm-title"><h3>Marking desk</h3><span class="status">${ids.length} player${ids.length===1?"":"s"} · ${ids.filter(id=>submitted(P[id],r)).length} submitted this round</span></div>`;
-  if(r==="ev"||r==="ev2"){const other=r==="ev"?G.event2:G.event;const cur=r==="ev"?G.event:G.event2;
-    h+=`<div class="evctl"><button class="btn primary" data-drawevent="${r}">Draw an event at random</button><select id="pickevent" data-slot="${r}" class="btn" aria-label="Choose an event"><option value="">or choose a card…</option>${EVENTS.filter(x=>x.id!==other).map(x=>`<option value="${x.id}" ${cur===x.id?"selected":""}>${x.t}</option>`).join("")}</select></div>`}
-  if(!ids.length){box.innerHTML=h+`<p class="hint">No students in ${esc(className(CLS))} yet. Post the student link above in Canvas and ask students to open it and type their name.</p>`;return}
-  if(r==="r0"){
-    h+=`<div class="tablewrap"><table><thead><tr><th>Player</th><th>Answers</th><th>Quiz</th><th></th></tr></thead><tbody>${ids.map(id=>{const p=P[id];
-      return`<tr><td><b>${esc(p.name)}</b></td><td class="mono" style="font-size:12px">${p.quiz?QUIZ.map(q=>{const v=p.quiz[q.id];return v==null||v===""?"–":q.type==="grid"?esc(v):"abcd"[v]}).join(" "):"<span class='pill no'>not yet</span>"}</td><td class="mono">${quizScore(p)}/${QUIZ.length}</td><td>${kick(id)}</td></tr>`}).join("")}</tbody></table></div>`;
-  }else if(MARKED.includes(r)){
-    h+=`<div class="tablewrap"><table><thead><tr><th>Player</th><th>Choices</th><th>Justification</th><th>Mark</th></tr></thead><tbody>${ids.map(id=>{const p=P[id];const m=M[id]||{};
-      return`<tr data-player="${id}"><td><b>${esc(p.name)}</b><br>${kick(id)}</td><td class="mono" style="white-space:nowrap">${esc(choiceSummary(p,r))}</td><td class="why">${esc((p.why||{})[r]||"")}</td><td>${seg([0,1,2,3],(m.j||{})[r]??"","mark")}</td></tr>`}).join("")}</tbody></table></div>${rubric()}`;
-  }else if(r==="pitch"){
-    h+=`<div class="tablewrap"><table><thead><tr><th>Player</th><th>Pitch</th>${PITCH.map(x=>`<th>${x[0]}</th>`).join("")}</tr></thead><tbody>${ids.map(id=>{const p=P[id];const pm=(M[id]||{}).pitch||[];
-      return`<tr data-player="${id}"><td><b>${esc(p.name)}</b></td><td class="why">${esc((p.why||{}).pitch||"")}</td>${PITCH.map((x,k)=>`<td>${seg([0,1,2],pm[k]??"","pm"+k)}</td>`).join("")}</tr>`}).join("")}</tbody></table></div>`;
-  }else{
-    h+=`<p class="hint">Results are showing on every screen in ${esc(className(CLS))}.</p><p><button class="btn primary" data-saveresults>Save results to the Google Sheet</button> <span class="status" id="savedres"></span></p><p>${ui.confirmReset?`Clear every player, answer and mark in ${esc(className(CLS))}? Other classes are not affected. <button class="btn on" data-reset2>Yes, start a new class</button> <button class="btn" data-cancelreset>Cancel</button>`:`<button class="btn" data-reset>Reset ${esc(className(CLS))}</button>`}</p>`;
-  }
-  box.innerHTML=h;
+function readAll_() {
+  const c = cache_().get('state');
+  if (c) return JSON.parse(c);
+  const state = { games: {}, players: {}, marks: {} };
+  const g = game_().getDataRange().getValues();
+  for (let i = 1; i < g.length; i++) if (g[i][0] && g[i][1]) { try { state.games[g[i][0]] = JSON.parse(g[i][1]); } catch (e) {} }
+  const p = players_().getDataRange().getValues();
+  for (let i = 1; i < p.length; i++) { if (!p[i][0]) continue; try { state.players[p[i][0]] = JSON.parse(p[i][DATA_COL - 1]); } catch (e) {} }
+  const m = marks_().getDataRange().getValues();
+  for (let i = 1; i < m.length; i++) { if (!m[i][0]) continue; try { state.marks[m[i][0]] = JSON.parse(m[i][3]); } catch (e) {} }
+  const json = JSON.stringify(state);
+  if (json.length < 95000) cache_().put('state', json, 3);
+  return state;
 }
 
-/* ================= map ================= */
-function townSVG(){
-  const L=ui.layers;let g=`<rect x="0" y="0" width="600" height="500" fill="var(--sunk)"/>`;
-  if(L.forest)g+=`<path d="M0,0 L400,0 C360,40 330,70 270,100 C220,130 180,190 110,220 C70,235 30,250 0,262 Z" fill="var(--forest)"/><text x="40" y="70" font-family="var(--f-display)" font-size="20" font-weight="600" fill="var(--forest-ink)" letter-spacing="2">TAUNUS FOREST</text>`;
-  [["M200,200 C230,185 300,195 320,225 C340,260 320,300 280,305 C240,310 200,290 195,260 Z","Oberursel-Mitte",210,295],
-   ["M150,145 C175,140 215,175 230,200 L205,215 C185,190 160,175 145,160 Z","Nord",150,138],
-   ["M360,130 C400,115 440,135 445,165 C450,195 410,205 380,195 C355,185 345,150 360,130 Z","Oberstedten",370,125],
-   ["M320,310 C355,300 400,315 400,345 C400,370 360,380 335,370 C315,360 305,325 320,310 Z","Bommersheim",330,395],
-   ["M110,330 C140,315 200,325 205,355 C210,385 165,395 135,388 C105,380 95,345 110,330 Z","Stierstadt",108,410],
-   ["M220,410 C250,400 290,405 295,430 C298,455 265,465 240,460 C215,455 205,425 220,410 Z","Weißkirchen",206,482]]
-   .forEach(b=>g+=`<path d="${b[0]}" fill="var(--built)" stroke="var(--line)"/><text x="${b[2]}" y="${b[3]}" font-family="var(--f-body)" font-size="12" font-weight="600" fill="var(--ink)">${b[1]}</text>`);
-  if(L.river)g+=`<path d="M40,30 C90,80 130,120 165,160 S235,225 262,250 S330,320 380,350 S470,420 520,450 S580,488 600,496" fill="none" stroke="var(--water)" stroke-width="3.5"/><text x="88" y="66" font-family="var(--f-body)" font-style="italic" font-size="12" fill="var(--water)" transform="rotate(42 88 66)">Urselbach</text><text x="470" y="414" font-family="var(--f-body)" font-style="italic" font-size="11" fill="var(--water)" transform="rotate(30 470 414)">→ Nidda</text>`;
-  if(L.road)g+=`<path d="M565,0 L548,180 L535,340 L520,500" fill="none" stroke="var(--road)" stroke-width="7"/><path d="M565,0 L548,180 L535,340 L520,500" fill="none" stroke="var(--surface)" stroke-width="1.5" stroke-dasharray="6 6"/>
-    <text x="566" y="250" font-family="var(--f-mono)" font-size="12" font-weight="500" fill="var(--ink)">A661</text>
-    <circle cx="548" cy="180" r="6" fill="var(--surface)" stroke="var(--road)" stroke-width="2"/><text x="472" y="176" font-family="var(--f-body)" font-size="10" fill="var(--muted)">OU-Nord</text>
-    <circle cx="535" cy="340" r="6" fill="var(--surface)" stroke="var(--road)" stroke-width="2"/><text x="466" y="360" font-family="var(--f-body)" font-size="10" fill="var(--muted)">Oberursel jct</text>
-    <path d="M300,262 C380,260 460,330 535,340" fill="none" stroke="var(--road)" stroke-width="3"/>`;
-  if(L.rail){g+=`<path d="M175,150 L232,212 L275,262 L345,335 L300,445 L300,500" fill="none" stroke="var(--ubahn)" stroke-width="3.5"/><path d="M600,95 L455,185 L275,262 L180,362 L300,445 L300,500" fill="none" stroke="var(--sbahn)" stroke-width="3.5" stroke-dasharray="10 4"/>`;
-    [[175,150],[275,262],[345,335],[180,362],[300,445]].forEach(s=>g+=`<rect x="${s[0]-6}" y="${s[1]-6}" width="12" height="12" rx="2" fill="var(--surface)" stroke="var(--ink)" stroke-width="2"/>`);
-    g+=`<text x="110" y="146" font-family="var(--f-mono)" font-size="10" fill="var(--ubahn)">U3 Hohemark</text><text x="290" y="268" font-family="var(--f-body)" font-size="11" font-weight="600" fill="var(--ink)">Bahnhof</text><text x="310" y="452" font-family="var(--f-body)" font-size="10" fill="var(--ink)">Weißkirchen Ost</text><text x="560" y="92" font-family="var(--f-mono)" font-size="10" fill="var(--sbahn)">S5</text>`;}
-  g+=`<circle cx="235" cy="240" r="5" fill="var(--accent)"/><text x="170" y="234" font-family="var(--f-body)" font-size="11" font-weight="600" fill="var(--accent)">Altstadt</text><rect x="200" y="166" width="14" height="10" fill="var(--ink)"/><text x="218" y="175" font-family="var(--f-body)" font-size="10" fill="var(--muted)">Engine works</text>`;
-  if(L.sites){const my=gmView()?null:(myDoc()||{}).r1;
-    [{k:"A",x:395,y:440,pts:"330,405 455,400 470,478 340,485"},{k:"B",x:470,y:255,pts:"432,218 508,218 503,292 437,292"},{k:"C",x:300,y:230,circle:[275,262,34]},{k:"D",x:148,y:150,pts:"100,118 185,104 196,172 118,190"}]
-    .forEach(s=>{const on=(ui.hl==="r1:"+s.k)||my===s.k;const st=`fill="var(--accent)" fill-opacity="${on?.35:.12}" stroke="var(--accent)" stroke-width="${on?3:2}" stroke-dasharray="6 4"`;
-      g+=s.circle?`<circle cx="${s.circle[0]}" cy="${s.circle[1]}" r="${s.circle[2]}" ${st}/>`:`<polygon points="${s.pts}" ${st}/>`;
-      g+=`<circle cx="${s.x}" cy="${s.y}" r="11" fill="var(--accent)"/><text x="${s.x}" y="${s.y+5}" text-anchor="middle" font-family="var(--f-display)" font-size="15" font-weight="700" fill="var(--on-accent)">${s.k}</text>`});}
-  {const mine=gmView()?[]:((myDoc()||{}).attr||[]);
-   mine.forEach(k=>{const a=ATTR[k];const[x,y]=a.at;
-     g+=`<path d="M${x},${y-11} L${x+3.2},${y-3.5} L${x+11},${y-3.5} L${x+4.8},${y+1.5} L${x+7},${y+9.5} L${x},${y+4.8} L${x-7},${y+9.5} L${x-4.8},${y+1.5} L${x-11},${y-3.5} L${x-3.2},${y-3.5} Z" fill="var(--road)" stroke="var(--ink)" stroke-width="1.2"/>
-       <text x="${x+13}" y="${y+4}" font-family="var(--f-body)" font-size="10" font-weight="600" fill="var(--ink)">${a.t.split(" ")[0]==="Taunus"?"Eco-tourism":a.t.split(/[ &]/)[0]}</text>`;
-     if(k==="cable")g+=`<line x1="175" y1="150" x2="0" y2="20" stroke="var(--ink)" stroke-width="1.5" stroke-dasharray="3 3"/>`;});}
-  if(L.grid){for(let i=1;i<6;i++)g+=`<line x1="${i*100}" y1="0" x2="${i*100}" y2="500" stroke="var(--ink)" stroke-opacity=".25"/>`;for(let j=1;j<5;j++)g+=`<line x1="0" y1="${j*100}" x2="600" y2="${j*100}" stroke="var(--ink)" stroke-opacity=".25"/>`;}
-  if(ui.pick)g+=`<rect x="${ui.pick.c*100}" y="${ui.pick.r*100}" width="100" height="100" fill="var(--accent)" fill-opacity=".18" stroke="var(--accent)" stroke-width="3"/>`;
-  g+=`<text x="8" y="292" font-family="var(--f-body)" font-size="11" fill="var(--muted)">← Kronberg</text><text x="420" y="18" font-family="var(--f-body)" font-size="11" fill="var(--muted)">Bad Homburg ~5 km →</text><text x="8" y="18" font-family="var(--f-body)" font-size="11" fill="var(--forest-ink)">↖ Großer Feldberg 881 m</text>
-    <g transform="translate(575,60)"><path d="M0,-18 L7,6 L0,1 L-7,6 Z" fill="var(--ink)"/><text y="20" text-anchor="middle" font-family="var(--f-display)" font-size="14" font-weight="700" fill="var(--ink)">N</text></g>`;
-  let m="";"ABCDEF".split("").forEach((c,i)=>m+=`<text x="${i*100+50}" y="-8" text-anchor="middle" font-family="var(--f-mono)" font-size="13" fill="var(--muted)">${c}</text>`);
-  for(let j=0;j<5;j++)m+=`<text x="-13" y="${j*100+55}" text-anchor="middle" font-family="var(--f-mono)" font-size="13" fill="var(--muted)">${j+1}</text>`;
-  m+=`<text x="4" y="520" font-family="var(--f-body)" font-size="11" fill="var(--muted)">↓ Frankfurt ~16 km (S5, U3)</text><text x="596" y="520" text-anchor="end" font-family="var(--f-body)" font-size="11" fill="var(--muted)">Sketch map · squares ≈ 1 km</text>`;
-  return`<svg id="town" viewBox="-26 -26 650 556" role="img" aria-label="Sketch map of Oberursel with grid squares A to F and 1 to 5"><rect x="-26" y="-26" width="650" height="556" fill="var(--surface)"/>${m}${g}</svg>`;
-}
-const PLACES=[["Oberursel",0,0],["Frankfurt",8,12.5],["Bad Homburg",5,-1.5],["Kronberg",-5,2.5],["Königstein",-7,-0.5],["Steinbach",-0.5,4],["Eschborn",-2.5,7],["Friedrichsdorf",9,-4.5],["Usingen",1.5,-15.5],["Neu-Anspach",-1,-11],["Großer Feldberg",-5.5,-6.5]];
-function regionSVG(){
-  const id=gmView()?ui.sphereFor:me;const p=id&&P[id];const o=p&&p.r3?OPT.r3[p.r3]:null;const k=10;
-  const att=(p&&p.attr||[]).map(a=>({k:a,o:attrOutcome(a,p)}));const rev=attrRevealed()||gmView();
-  const live=att.filter(x=>!rev||x.o.ok);
-  const rkm=Math.max(o?o.km:3,...live.map(x=>x.o.range));
-  let g=`<rect x="-200" y="-200" width="400" height="400" fill="var(--sunk)"/><path d="M-200,-200 L200,-200 L200,-120 C120,-95 60,-70 10,-35 C-40,-10 -120,5 -200,15 Z" fill="var(--forest)" opacity=".8"/><text x="-180" y="-150" font-family="var(--f-display)" font-size="16" font-weight="600" fill="var(--forest-ink)" letter-spacing="2">TAUNUS</text>
-  <circle cx="80" cy="125" r="300" fill="var(--ubahn)" fill-opacity=".07" stroke="var(--ubahn)" stroke-width="1.5" stroke-dasharray="4 4"/><text x="100" y="-10" font-family="var(--f-body)" font-size="10" fill="var(--ubahn)">Frankfurt's sphere (~30 km)</text>
-  <circle cx="50" cy="-15" r="70" fill="none" stroke="var(--muted)" stroke-dasharray="2 3"/><text x="70" y="-80" font-family="var(--f-body)" font-size="9" fill="var(--muted)">Bad Homburg (~7 km)</text>
-  <circle cx="0" cy="0" r="${rkm*k}" fill="var(--accent)" fill-opacity=".16" stroke="var(--accent)" stroke-width="2.5"/>`;
-  att.forEach(x=>{const ok=!rev||x.o.ok;g+=`<circle cx="0" cy="0" r="${x.o.range*k}" fill="none" stroke="${ok?"var(--road)":"var(--muted)"}" stroke-width="1.5" stroke-dasharray="${ok?"6 3":"2 4"}"/>
-    <text x="4" y="${-x.o.range*k+12}" font-family="var(--f-body)" font-size="9" fill="${ok?"var(--ink)":"var(--muted)"}">${ATTR[x.k].t.split(/[ &]/)[0]} ${x.o.range} km${rev?(x.o.ok?" ✓":" ✗ closed"):""}</text>`});
-  if(p&&p.en==="A")g+=`<g transform="translate(-55,-65)">${[0,10,20].map(dx=>`<line x1="${dx}" y1="0" x2="${dx}" y2="-14" stroke="var(--ink)" stroke-width="1.5"/><circle cx="${dx}" cy="-14" r="2" fill="var(--ink)"/>`).join("")}<text x="26" y="-4" font-family="var(--f-body)" font-size="9" fill="var(--ink)">turbines</text></g>`;
-  PLACES.forEach(([n,x,y])=>{const big=n==="Frankfurt",mine=n==="Oberursel",peak=n==="Großer Feldberg";
-    g+=peak?`<path d="M${x*k},${y*k-6} L${x*k+6},${y*k+4} L${x*k-6},${y*k+4} Z" fill="var(--forest-ink)"/>`:`<circle cx="${x*k}" cy="${y*k}" r="${big?9:mine?6:4}" fill="${mine?"var(--accent)":"var(--ink)"}"/>`;
-    g+=`<text x="${x*k+(big?12:8)}" y="${y*k+4}" font-family="var(--f-body)" font-size="${big?13:11}" font-weight="${big||mine?600:400}" fill="var(--ink)">${n}</text>`});
-  g+=`<g transform="translate(-180,178)"><line x1="0" y1="0" x2="50" y2="0" stroke="var(--ink)" stroke-width="2"/><line x1="0" y1="-4" x2="0" y2="4" stroke="var(--ink)" stroke-width="2"/><line x1="50" y1="-4" x2="50" y2="4" stroke="var(--ink)" stroke-width="2"/><text x="56" y="4" font-family="var(--f-mono)" font-size="10" fill="var(--ink)">5 km</text></g><g transform="translate(180,-170)"><path d="M0,-14 L6,6 L0,2 L-6,6 Z" fill="var(--ink)"/><text y="20" text-anchor="middle" font-family="var(--f-display)" font-size="13" font-weight="700" fill="var(--ink)">N</text></g>`;
-  const cap=(o||att.length)?`${esc(p.name)}: sphere of influence ≈ ${rkm} km${o?` · project: ${o.t} (${o.km} km)`:""}${att.length?` · attractions: ${att.map(x=>ATTR[x.k].t+" "+x.o.range+" km"+(rev?(x.o.ok?" ✓":" ✗"):"")).join(", ")}`:""}`:"Today: Oberursel's own sphere ≈ 3 km (low- and middle-order services)";
-  return`<svg viewBox="-200 -200 400 400" role="img" aria-label="Regional map of spheres of influence">${g}</svg><p class="hint" style="margin:8px 10px 10px">${cap}</p>`;
-}
-function renderMap(){
-  const box=$("#mappanel");if(!box)return;const town=ui.mapView==="town";const picking=town&&ui.activeQ;
-  let h=`<div class="gm-title"><h3>${town?"Town map":"Region: spheres of influence"}</h3><div class="maptabs"><button class="btn small ${town?"on":""}" data-view="town">Town grid</button><button class="btn small ${!town?"on":""}" data-view="region">Region</button></div></div>
-   ${picking?`<p class="status ok" style="margin:0 0 8px">Click the map to answer question ${QUIZ.findIndex(q=>q.id===ui.activeQ)+1}.</p>`:""}
-   <div class="mapbox ${picking?"picking":""}">${town?townSVG():regionSVG()}</div>`;
-  if(town)h+=`<div class="layers">${[["forest","Forest"],["river","River"],["rail","Rail"],["road","Roads"],["sites","Sites A–D"],["grid","Grid"]].map(([k,n])=>`<label><input type="checkbox" id="ly-${k}" data-layer="${k}" ${ui.layers[k]?"checked":""}> ${n}</label>`).join("")}</div>
-    <div class="legend"><span><i class="sw" style="background:var(--ubahn)"></i>U3</span><span><i class="sw" style="background:var(--sbahn)"></i>S5</span><span><i class="sw" style="background:var(--road)"></i>A661 / main road</span><span><i class="sw" style="background:var(--built)"></i>Built-up</span><span><i class="sw" style="background:var(--accent);opacity:.5"></i>Housing site</span></div>`;
-  else if(!gmView())h+=`<p class="hint">Town populations are in the table under Decision 2. The red ring is your sphere of influence; dashed rings are your attractions' ranges.</p>`;
-  if(!town&&gmView()){const ids=Object.keys(P).filter(id=>P[id].r3||(P[id].attr||[]).length);h+=ids.length?`<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">${ids.map(id=>`<button class="btn small ${ui.sphereFor===id?"on":""}" data-sphere="${id}">${esc(P[id].name)}</button>`).join("")}</div>`:`<p class="hint">Spheres appear here once students choose a flagship project.</p>`}
-  box.innerHTML=h;
+/* ---------- API called from the page ---------- */
+function checkKey(key) { return isTeacher_(key); }
+
+/** Everyone polls this for one class. Other students' written justifications are only sent to the teacher. */
+function getState(key, myId, cls) {
+  requireClass_(cls);
+  const all = readAll_();
+  const teacher = isTeacher_(key);
+  const out = { cls: cls, game: all.games[cls] || null, players: {}, marks: {} };
+  Object.keys(all.players).forEach(function (id) {
+    const p = all.players[id];
+    if (!p || p.cls !== cls) return;
+    if (!teacher && id !== myId) { p.why = undefined; delete p.why; }
+    out.players[id] = p;
+    if (all.marks[id]) out.marks[id] = all.marks[id];
+  });
+  return out;
 }
 
-/* ================= side panels ================= */
-function renderMine(){
-  const box=$("#mine");if(!box)return;const p=myDoc();if(!p||gmView()){box.innerHTML="";return}
-  const c=compute(p,M[me]);
-  box.innerHTML=`<div class="gm-title"><h3>Your Oberursel</h3><span class="mono" style="font:600 28px var(--f-display)">${c.total} pts</span></div>
-   <div class="mine">${IND.map(([q,n])=>`<div class="bar">${n} ${c.ind[q]}<i><s style="width:${c.ind[q]}%;background:${color(c.ind[q])}"></s></i></div>`).join("")}</div>
-   <div class="minemeta"><span class="${c.budget<0?"neg":""}">€${c.budget}m of €${BUDGET}m left</span>${p.r1?`<span class="${c.shortfall?"neg":""}">${c.homes.toLocaleString("en")} / ${TARGET.toLocaleString("en")} homes</span>`:""}<span>Quiz ${c.quiz}/${QUIZ.length}</span><span>Marks ${c.just}</span>${c.weak?`<span class="neg">${c.weak} score${c.weak>1?"s":""} below 35 (−5 each)</span>`:""}</div>
-   ${c.notes.length?`<p class="hint" style="color:var(--bad)">${c.notes.map(esc).join("<br>")}</p>`:""}`;
-}
-function renderBoard(){
-  const box=$("#board");if(!box)return;const rk=ranked();
-  box.innerHTML=`<div class="gm-title"><h3>Class leaderboard</h3><span class="label">${rk.length} planners</span></div>`+(rk.length?`<ol class="lb">${rk.map((x,k)=>`<li class="${x.id===me?"me":""}"><span class="rk">${k+1}</span><span class="nm">${esc(x.p.name)}${x.id===me?" (you)":""}<span class="ch">${shortPath(x.p)}</span></span><span class="tot mono">${x.c.total}</span></li>`).join("")}</ol><p class="hint">Letters show each planner's homes · transport · energy · project choices.</p>`:`<p class="hint">No one has joined yet.</p>`);
-}
-function renderSteps(){
-  const box=$("#steps");if(!box)return;const cur=RI(G.round);const can=gmView()||LOCAL;const p=myDoc();
-  box.innerHTML=ROUNDS.map((r,i)=>`<button class="step ${i>cur&&!can?"locked":""} ${!gmView()&&i<cur&&submitted(p,r.id)?"done":""}" ${can?`data-round="${r.id}"`:"disabled"} aria-current="${G.round===r.id}"><span class="l">Lesson ${r.lesson}</span><span class="t">${r.title}</span></button>`).join("");
-}
-function renderTop(){
-  const p=myDoc();
-  const pickClass=`<select id="classpick" class="btn" aria-label="Class">${CLASSES.map(c=>`<option value="${c.id}" ${c.id===CLS?"selected":""}>${c.name}</option>`).join("")}</select>`;
-  $("#who").innerHTML=gmView()?`<span class="label">Game master</span>${pickClass}<button class="btn" data-preview>Student view</button><button class="btn" id="proj">${document.body.classList.contains("projector")?"Show marking":"Projector"}</button>`
-   :isGM?`<span class="label">Previewing student view</span><button class="btn on" data-preview>Back to game master</button>`
-   :p?`<span class="label">${esc(className(CLS))}</span><b>${esc(p.name)}</b><button class="btn small" data-notme title="Use this if someone else played on this device">Not you?</button>`:"";
-  $("#tctl").innerHTML=gmView()?`${[3,5,10,15].map(m=>`<button class="btn small" data-timer="${m}">${m}m</button>`).join("")}<button class="btn small" data-timerstop>Stop</button>`:"";
+function savePlayer(id, data) {
+  if (!/^[a-z0-9]{8,40}$/.test(String(id))) throw new Error('Bad player id.');
+  data = data || {};
+  requireClass_(data.cls);
+  const json = JSON.stringify(data);
+  if (json.length > 40000) throw new Error('Too much text.');
+  const name = String(data.name || '').slice(0, 40);
+  if (!name) throw new Error('Name missing.');
+  return withLock_(function () {
+    const sh = players_();
+    const row = [id, name, CLASSES[data.cls], new Date(), data.r1 || '', data.r2 || '', data.en || '', data.r3 || '', (data.attr || []).join(', '), json];
+    const r = rowIndexById_(sh, id);
+    if (r > 0) sh.getRange(r, 1, 1, row.length).setValues([row]); else sh.appendRow(row);
+    return true;
+  });
 }
 
-/* ================= layout ================= */
-function renderAll(){
-  renderTop();
-  if(!gmView()&&!myDoc()){renderJoin();return}
-  if(!$("#stage")){
-    $("#app").innerHTML=`<nav class="steps" id="steps" aria-label="Rounds"></nav>
-      ${LOCAL?`<p class="status err" style="margin:0 0 12px">You are playing offline: this view isn't connected to the class game, so your score stays on this device. Ask your teacher for access, then reopen the page.</p>`:""}
-      <div class="layout"><div class="stack"><section class="panel" id="stage"></section><section class="panel gm" id="gm"></section></div>
-      <div class="stack"><section class="panel" id="mappanel"></section><section class="panel" id="mine"></section><section class="panel" id="board"></section></div></div>`;
-  }
-  $("#gm").hidden=!gmView();$("#mine").hidden=gmView();
-  renderSteps();(gmView()?renderGMStage:renderStudentStage)();renderDesk();renderMap();renderMine();renderBoard();
-}
-function renderJoin(){
-  $("#app").innerHTML=`<div class="join panel"><span class="label">Year 9 · Settlements</span><h2>Join the planning game</h2>
-    <p>You are an urban planner deciding the future of Oberursel. You will make more than 15 decisions. Each has winners and losers, and each must be justified. Highest score wins.</p>
-    <span class="label">Your class</span>
-    <div class="segrow" style="margin:0">${CLASSES.map(c=>`<button class="btn ${ui.joinCls===c.id?"on":""}" data-joincls="${c.id}">${c.name}</button>`).join("")}</div>
-    <label for="joinname" class="label">Your name (as your teacher knows you)</label><input id="joinname" maxlength="40" autocomplete="off" placeholder="First name and initial" value="${esc(ui.joinName||"")}">
-    <button class="btn primary big" data-join>Join the game</button><span class="status err" id="joinmsg"></span></div>`;
+function setGame(key, cls, game) {
+  requireTeacher_(key); requireClass_(cls);
+  return withLock_(function () {
+    const sh = game_();
+    const r = rowIndexById_(sh, cls);
+    const v = JSON.stringify(game || {});
+    if (r > 0) sh.getRange(r, 2).setValue(v); else sh.appendRow([cls, v]);
+    return true;
+  });
 }
 
-/* ================= actions ================= */
-function refreshStudent(){renderStudentStage();renderMine();renderBoard();renderMap()}
-async function savePlayer(p,key,okText){
-  P[me]=Object.assign({},p,{updatedAt:Date.now()});ui.msg[key]={ok:true,t:"Saving…"};refreshStudent();
-  try{await write("players/"+me,P[me]);ui.msg[key]={ok:true,t:okText||"Saved."}}
-  catch(e){ui.msg[key]={ok:false,t:"Couldn't save. Check your internet connection and try again."}}
-  if(!gmView())refreshStudent();
+function setMark(key, id, mark) {
+  requireTeacher_(key);
+  return withLock_(function () {
+    const sh = marks_();
+    const p = rowIndexById_(players_(), id);
+    const name = p > 0 ? players_().getRange(p, 2).getValue() : '';
+    const cls = p > 0 ? players_().getRange(p, 3).getValue() : '';
+    const row = [id, name, cls, JSON.stringify(mark || {})];
+    const r = rowIndexById_(sh, id);
+    if (r > 0) sh.getRange(r, 1, 1, 4).setValues([row]); else sh.appendRow(row);
+    return true;
+  });
 }
-async function setGame(patch){
-  G=Object.assign({},G,patch);renderAll();
-  try{await write("game/state",G)}catch(e){alertBar("Couldn't update the game for students. Check your connection.")}
-}
-async function setMark(id,patch){
-  const m=Object.assign({j:{},pitch:[0,0,0,0]},M[id]);
-  if(patch.j)m.j=Object.assign({},m.j,patch.j);if(patch.pitch)m.pitch=patch.pitch;
-  M[id]=m;renderDesk();renderBoard();
-  try{await write("marks/"+id,m)}catch(e){alertBar("A mark didn't save. Try again.")}
-}
-function alertBar(t){const s=$("#steps");if(s){const d=document.createElement("p");d.className="status err";d.textContent=t;s.after(d);setTimeout(()=>d.remove(),5000)}}
-async function removeDocs(ids){await api("kick",KEY,ids)}
 
-document.addEventListener("click",async e=>{
-  const b=e.target.closest("button,[data-hl],svg#town");if(!b)return;const d=b.dataset||{};
-  if(d.joincls){ui.joinCls=d.joincls;ui.joinName=$("#joinname").value;renderJoin();return}
-  if(d.notme!==undefined){newId(CLS);delete P[me];me=getId(CLS);ui.joinCls=CLS;ui.joinName="";$("#app").innerHTML="";renderAll();return}
-  if(d.join!==undefined){const n=$("#joinname").value.trim();if(!ui.joinCls){$("#joinmsg").textContent="Choose your class first.";return}if(n.length<2){$("#joinmsg").textContent="Type your name first.";return}
-    if(ui.joinCls!==CLS)await switchClass(ui.joinCls,true);
-    P[me]={name:n,why:{},joined:Date.now()};$("#joinmsg").textContent="Joining…";
-    try{await write("players/"+me,P[me]);$("#app").innerHTML="";renderAll()}catch(err){delete P[me];$("#joinmsg").textContent="Couldn't join. Check your internet connection and try again."}return}
-  if(d.preview!==undefined){ui.preview=!ui.preview;$("#app").innerHTML="";renderAll();return}
-  if(b.id==="proj"){document.body.classList.toggle("projector");renderTop();return}
-  if(d.round){if(gmView())setGame({round:d.round});else if(LOCAL){G.round=d.round;saveLocal();renderAll()}return}
-  if(d.timer){setGame({timerEnd:Date.now()+(+d.timer)*60000});return}
-  if(d.timerstop!==undefined){setGame({timerEnd:null});return}
-  if(d.view){ui.mapView=d.view;renderMap();return}
-  if(d.sphere){ui.sphereFor=d.sphere;renderMap();return}
-  if(d.hl){ui.hl=ui.hl===d.hl?null:d.hl;ui.mapView="town";renderMap();return}
-  if(d.drawevent){const slot=d.drawevent;const other=slot==="ev"?G.event2:G.event;const curr=slot==="ev"?G.event:G.event2;
-    const pool=EVENTS.filter(x=>x.id!==other&&x.id!==curr);setGame({[slot==="ev"?"event":"event2"]:pool[Math.floor(Math.random()*pool.length)].id});return}
-  if(d.kick){const id=d.kick;delete P[id];delete M[id];renderDesk();renderBoard();if(!LOCAL){try{await removeDocs([id])}catch(err){alertBar("Couldn't remove that player.")}}return}
-  if(d.saveresults!==undefined){const hd=["Rank","Name","Economy","Environment","Community","Connectivity","Average","Penalties","Quiz","Justification marks","Pitch","Total","Homes","Transport","Energy","Project","Attractions"];
-    const rows=ranked().map((x,i)=>[i+1,x.p.name,x.c.ind.eco,x.c.ind.env,x.c.ind.com,x.c.ind.con,+x.c.si.toFixed(1),x.c.penalty,x.c.quiz,x.c.just,x.c.pitch,x.c.total,x.p.r1||"",x.p.r2||"",x.p.en||"",x.p.r3||"",(x.p.attr||[]).join(", ")]);
-    $("#savedres").textContent="Saving…";try{const nm=await api("saveResults",KEY,CLS,hd,rows);$("#savedres").textContent="Saved to the tab “"+nm+"”."}catch(err){$("#savedres").textContent="Couldn't save the results."}return}
-  if(d.reset!==undefined){ui.confirmReset=true;renderDesk();return}
-  if(d.cancelreset!==undefined){ui.confirmReset=false;renderDesk();return}
-  if(d.reset2!==undefined){ui.confirmReset=false;const ids=Object.keys(P);ids.forEach(id=>{delete P[id];delete M[id]});
-    try{await api("resetAll",KEY,CLS)}catch(err){alertBar("Some players couldn't be removed.")}
-    setGame({round:"r0",event:null,event2:null,timerEnd:null});return}
-  const tr=b.closest("tr[data-player]");
-  if(tr&&d.mark!==undefined){setMark(tr.dataset.player,{j:{[G.round]:+d.mark}});return}
-  if(tr){for(let k=0;k<4;k++)if(d["pm"+k]!==undefined){const pm=((M[tr.dataset.player]||{}).pitch||[0,0,0,0]).slice();pm[k]=+d["pm"+k];setMark(tr.dataset.player,{pitch:pm});return}}
-  /* student decisions: held locally until "Lock in" */
-  const p=Object.assign({why:{}},myDoc());
-  if(d.pick){const[k,L]=d.pick.split(":");if(!canEditRound(k))return;p[k]=L;if(k==="r1")ui.hl="r1:"+L;P[me]=p;ui.msg[k]={ok:false,t:"Not saved yet: finish your decisions and lock in."};refreshStudent();return}
-  if(d.sub){const[s,v]=d.sub.split(":");const rid=Object.keys(ROUND_SUBS).find(r=>ROUND_SUBS[r].includes(s));if(!canEditRound(rid))return;p[s]=v;P[me]=p;ui.msg[rid]={ok:false,t:"Not saved yet: finish your decisions and lock in."};refreshStudent();return}
-  if(d.attr){if(!canEditRound("r3"))return;const list=(p.attr||[]).slice();const i=list.indexOf(d.attr);
-    if(i>=0)list.splice(i,1);else{if(list.length>=MAXATTR){ui.msg.r3={ok:false,t:`You can choose up to ${MAXATTR} attractions. Remove one first.`};renderStudentStage();return}list.push(d.attr)}
-    p.attr=list;P[me]=p;ui.msg.r3={ok:false,t:"Not saved yet: finish your decisions and lock in."};refreshStudent();return}
-  if(d.stake){const[rid,v]=d.stake.split(":");if(!canEditRound(rid))return;p["s_"+rid]=v;P[me]=p;ui.msg[rid]={ok:false,t:"Not saved yet: finish your decisions and lock in."};refreshStudent();return}
-  if(d.submit){const k=d.submit;const txt=(ui.drafts[k]??(p.why[k]||"")).trim();
-    if(k!=="pitch"){const missing=(STAKE[k]||ROUND_SUBS[k])?needs(k).filter(([f])=>!has(p,f)):(!p[k]?[[k,"your response"]]:[]);
-      if(missing.length){ui.msg[k]={ok:false,t:"Still to decide: "+missing.map(x=>x[1]).join(", ")+"."};renderStudentStage();return}}
-    if(words(txt)<MINWORDS){ui.msg[k]={ok:false,t:`Write at least ${MINWORDS} words to justify your decisions.`};renderStudentStage();return}
-    p.why=Object.assign({},p.why,{[k]:txt});delete ui.drafts[k];savePlayer(p,k,"Locked in. You can still change it until the round closes.");return}
-  if(d.activeq){ui.activeQ=ui.activeQ===d.activeq?null:d.activeq;ui.mapView="town";renderStudentStage();renderMap();return}
-  if(d.mc){const[q,k]=d.mc.split(":");ui.quizDraft[q]=+k;renderStudentStage();return}
-  if(d.submitquiz!==undefined){p.quiz=Object.assign({},p.quiz||{},ui.quizDraft);ui.quizDraft={};savePlayer(p,"r0","Answers saved. You can change them until the round closes.");return}
-  if(b.id==="town"&&ui.activeQ&&!gmView()){
-    const pt=b.createSVGPoint();pt.x=e.clientX;pt.y=e.clientY;const loc=pt.matrixTransform(b.getScreenCTM().inverse());
-    if(loc.x<0||loc.x>=600||loc.y<0||loc.y>=500)return;
-    const c=Math.floor(loc.x/100),r=Math.floor(loc.y/100);ui.pick={c,r};ui.quizDraft[ui.activeQ]="ABCDEF"[c]+(r+1);ui.activeQ=null;
-    renderStudentStage();renderMap();setTimeout(()=>{ui.pick=null;renderMap()},1500);
-  }
-});
-document.addEventListener("input",e=>{const d=e.target.dataset;
-  if(d.why){ui.drafts[d.why]=e.target.value;const w=$("#wc-"+d.why);if(w)w.textContent=`${words(e.target.value)} words (min ${MINWORDS})`}
-  if(d.grid){ui.quizDraft[d.grid]=e.target.value.toUpperCase().trim()}});
-document.addEventListener("change",e=>{const d=e.target.dataset;if(d.layer){ui.layers[d.layer]=e.target.checked?1:0;renderMap()}
-  if(e.target.id==="pickevent"&&e.target.value)setGame({[d.slot==="ev"?"event":"event2"]:e.target.value})});
-document.addEventListener("keydown",e=>{if(e.key==="Enter"&&e.target.id==="joinname"){const b=document.querySelector("[data-join]");if(b)b.click()}});
+function deleteIds_(ids) {
+  [players_(), marks_()].forEach(function (sh) {
+    (ids || []).forEach(function (id) { const r = rowIndexById_(sh, id); if (r > 0) sh.deleteRow(r); });
+  });
+}
 
-setInterval(()=>{const c=$("#clock");if(!c)return;if(!G.timerEnd){c.textContent="--:--";c.classList.remove("low");return}
-  const left=Math.max(0,Math.round((G.timerEnd-Date.now())/1000));c.textContent=String(Math.floor(left/60)).padStart(2,"0")+":"+String(left%60).padStart(2,"0");c.classList.toggle("low",left<=30)},500);
+function kick(key, ids) {
+  requireTeacher_(key);
+  return withLock_(function () { deleteIds_(ids); return true; });
+}
 
-/* ================= boot ================= */
-function mkId(){return Array.from({length:16},()=>"abcdefghijklmnopqrstuvwxyz0123456789"[Math.floor(Math.random()*36)]).join("")}
-const memIds={};
-function getId(cls){const k="ou2050-id-"+cls;try{let v=localStorage.getItem(k);if(!v){v=mkId();localStorage.setItem(k,v)}return v}catch(e){return memIds[k]||(memIds[k]=mkId())}}
-function newId(cls){const k="ou2050-id-"+cls;const v=mkId();memIds[k]=v;try{localStorage.setItem(k,v)}catch(e){}}
-function resetClassState(){Object.keys(P).forEach(k=>delete P[k]);Object.keys(M).forEach(k=>delete M[k]);G={round:"r0",event:null,event2:null,timerEnd:null};ui.drafts={};ui.msg={};ui.quizDraft={};ui.sphereFor=null;ui.confirmReset=false}
-async function switchClass(cls,keepScreen){
-  CLS=cls;me=getId(cls);resetClassState();STUDENT_URL=location.origin+location.pathname+"?class="+cls;
-  try{localStorage.setItem(isGM?"ou2050-teacher-class":"ou2050-class",cls)}catch(e){}
-  if(!keepScreen){$("#app").innerHTML=`<p class="status" style="margin-top:20px">Loading ${esc(className(cls))}…</p>`}
-  await poll(true);
-  if(!pollTimer)pollTimer=setInterval(poll,isGM?4000:6000);
+/** Clears one class only: its players, marks and game state. */
+function resetAll(key, cls) {
+  requireTeacher_(key); requireClass_(cls);
+  return withLock_(function () {
+    const p = players_().getDataRange().getValues();
+    const ids = [];
+    for (let i = 1; i < p.length; i++) {
+      if (!p[i][0]) continue;
+      try { if (JSON.parse(p[i][DATA_COL - 1]).cls === cls) ids.push(String(p[i][0])); } catch (e) {}
+    }
+    deleteIds_(ids);
+    const g = rowIndexById_(game_(), cls);
+    if (g > 0) game_().deleteRow(g);
+    return ids.length;
+  });
 }
-let polling=false;
-async function poll(force){
-  if(!CLS)return;
-  if(polling&&!force)return;polling=true;
-  try{
-    const s=await api("getState",KEY||"",me,CLS);
-    if(s.cls!==CLS)return;
-    const prev=JSON.stringify([G.round,G.event,G.event2]);
-    if(s.game)G=Object.assign({round:"r0",event:null,event2:null,timerEnd:null},s.game);
-    const seen=new Set(Object.keys(s.players||{}));
-    Object.keys(s.players||{}).forEach(id=>{if(id===me&&P[me])return;P[id]=s.players[id]});
-    Object.keys(P).forEach(id=>{if(!seen.has(id)&&id!==me)delete P[id]});
-    Object.keys(M).forEach(id=>delete M[id]);Object.assign(M,s.marks||{});
-    if($("#joinname")&&!myDoc()&&!gmView()){renderTop();return}
-    if(!$("#stage")||prev!==JSON.stringify([G.round,G.event,G.event2])){ui.activeQ=null;ui.msg={};renderAll()}
-    else{renderBoard();renderDesk();renderMine();if(gmView())renderMap()}
-  }catch(e){}finally{polling=false}
+
+/** Writes one class's final results table to a new tab so it can go into a gradebook. */
+function saveResults(key, cls, header, rows) {
+  requireTeacher_(key); requireClass_(cls);
+  const name = CLASSES[cls] + ' ' + Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd HH-mm');
+  const sh = ss_().insertSheet(name.replace(/[^\w äöüÄÖÜß–-]/g, ''));
+  sh.getRange(1, 1, 1, header.length).setValues([header]).setFontWeight('bold');
+  if (rows.length) sh.getRange(2, 1, rows.length, header.length).setValues(rows);
+  sh.setFrozenRows(1);
+  return sh.getName();
 }
-function renderClassPicker(){
-  renderTop();
-  $("#app").innerHTML=`<div class="join panel"><span class="label">Game master</span><h2>Which class are you teaching?</h2>
-    <p>Each class has its own game, leaderboard and marks. You can switch class at any time from the top bar.</p>
-    <div class="opts three">${CLASSES.map(c=>`<button class="opt sm" data-teachcls="${c.id}"><h3>${c.name}</h3><span class="grid-ref">${c.teacher}</span></button>`).join("")}</div></div>`;
-}
-document.addEventListener("click",e=>{const b=e.target.closest("[data-teachcls]");if(b)switchClass(b.dataset.teachcls)});
-document.addEventListener("change",e=>{if(e.target.id==="classpick"&&e.target.value!==CLS)switchClass(e.target.value)});
-function renderLogin(err){
-  $("#app").innerHTML=`<div class="join panel"><span class="label">Teacher</span><h2>Game master login</h2>
-    <label for="pw" class="label">Teacher password</label><input id="pw" type="password" autocomplete="current-password">
-    <button class="btn primary big" data-login>Open the game master view</button><span class="status err" id="loginmsg">${err||""}</span></div>`;
-}
-document.addEventListener("click",async e=>{const b=e.target.closest("[data-login]");if(!b)return;
-  const pw=$("#pw").value;$("#loginmsg").textContent="Checking…";
-  let ok=false;try{ok=await api("checkKey",pw)}catch(err){
-    $("#loginmsg").textContent="Can't reach the Google Sheet service ("+(err&&err.message||err)+"). In Apps Script, check Deploy → Manage deployments: Who has access must be Anyone, then deploy a New version.";return}
-  if(!ok){$("#loginmsg").textContent="The service answered, but that password doesn't match TEACHER_PASSWORD in Code.gs. After changing it there, deploy a New version.";return}
-  KEY=pw;try{localStorage.setItem("ou2050-key",pw)}catch(err){}isGM=true;$("#app").innerHTML="";startTeacher()});
-document.addEventListener("keydown",e=>{if(e.key==="Enter"&&e.target.id==="pw"){const b=document.querySelector("[data-login]");if(b)b.click()}});
-function startTeacher(){
-  let c=URL_CLASS;if(!c){try{c=localStorage.getItem("ou2050-teacher-class")}catch(e){}}
-  if(c&&CLASSES.some(x=>x.id===c))switchClass(c);else renderClassPicker();
-}
-(async function boot(){
-  if(!CONFIGURED){$("#app").innerHTML=`<div class="join panel"><span class="label">Setup needed</span><h2>Almost there</h2><p>This page isn't connected to its Google Sheet yet. Open <span class="mono">index.html</span> on GitHub and paste your Apps Script web app link into <span class="mono">API_URL</span> near the top of the script. The README explains each step.</p></div>`;return}
-  if(MODE==="teacher"){
-    try{KEY=localStorage.getItem("ou2050-key")}catch(e){}
-    let ok=false;if(KEY){try{ok=await api("checkKey",KEY)}catch(e){}}
-    if(!ok){KEY=null;renderLogin();return}
-    isGM=true;startTeacher();return;
-  }
-  let c=URL_CLASS;if(!c){try{c=localStorage.getItem("ou2050-class")}catch(e){}}
-  if(c&&CLASSES.some(x=>x.id===c)){ui.joinCls=c;switchClass(c)}else renderJoin();
-})();
-</script>
-</body>
-</html>
