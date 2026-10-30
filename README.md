@@ -35,7 +35,7 @@ Four classes each have their own game, players, marks, leaderboard and results t
 | Roberts – Class 1 | `?class=roberts-1` |
 | Roberts – Class 2 | `?class=roberts-2` |
 | Stothard | `?class=stothard` |
-| Langellüddecke | `?class=langellueddecke` |
+| Langelüddecke | `?class=langelueddecke` |
 
 For example: `https://mrmroberts2010-a11y.github.io/Oberursel-2050/?class=stothard`. Students who open the plain address choose their class on the join screen.
 

@@ -418,7 +418,7 @@ const CLASSES=[
  {id:"roberts-1",name:"Roberts – Class 1",teacher:"Roberts"},
  {id:"roberts-2",name:"Roberts – Class 2",teacher:"Roberts"},
  {id:"stothard",name:"Stothard",teacher:"Stothard"},
- {id:"langellueddecke",name:"Langellüddecke",teacher:"Langellüddecke"}
+ {id:"langelueddecke",name:"Langelüddecke",teacher:"Langelüddecke"}
 ];
 const className=id=>(CLASSES.find(c=>c.id===id)||{}).name||"";
 const URL_CLASS=(()=>{const c=new URLSearchParams(location.search).get("class");return CLASSES.some(x=>x.id===c)?c:null})();

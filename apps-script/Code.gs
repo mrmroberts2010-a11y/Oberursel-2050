@@ -14,7 +14,7 @@ const CLASSES = {
   'roberts-1': 'Roberts – Class 1',
   'roberts-2': 'Roberts – Class 2',
   'stothard': 'Stothard',
-  'langellueddecke': 'Langellüddecke'
+  'langelueddecke': 'Langelüddecke'
 };
 
 /* ---------- web app ---------- */
