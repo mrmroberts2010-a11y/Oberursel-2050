@@ -210,7 +210,11 @@ img{max-width:100%}
   <div class="who" id="who"></div>
   <div class="timer" aria-label="Round timer"><span class="clock mono" id="clock">--:--</span><span id="tctl"></span></div>
 </header>
-<div id="app"><p class="status" style="margin-top:20px">Connecting to the class game…</p></div>
+<div id="app"><p class="status" style="margin-top:20px">Connecting to the class game… (version 3)</p></div>
+<script>
+window.onerror=function(msg,src,line,col){var a=document.getElementById("app");if(a)a.innerHTML='<div class="join panel"><span class="label">Something went wrong</span><h2>Error</h2><p class="mono" style="overflow-wrap:anywhere">'+String(msg).replace(/</g,"&lt;")+' (line '+line+':'+col+')</p><p>Copy this message to Claude.</p></div>';};
+window.addEventListener("unhandledrejection",function(e){window.onerror("Unhandled: "+(e.reason&&e.reason.message||e.reason),"",0,0)});
+</script>
 
 <script>
 /* Served by Google Apps Script: settings come from the server */
