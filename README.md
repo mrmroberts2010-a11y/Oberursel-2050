@@ -27,6 +27,13 @@ A two-lesson decision game for Year 9 Geography (Settlements). Each student play
 2. Under **Build and deployment**, choose **Deploy from a branch**, branch **main**, folder **/ (root)**, and save.
 3. After a minute or two, the same page shows your site's address, something like `https://mrmroberts2010-a11y.github.io/Oberursel-2050/`.
 
+## Simplest option: run it all from Google (no GitHub Pages)
+If the GitHub page can't reach the Apps Script (common when a school only allows signed-in users), let Apps Script serve the page itself:
+1. In Apps Script, replace `Code.gs` with [`apps-script/Code.gs`](apps-script/Code.gs) (keep your password).
+2. Click **+ → HTML**, name it `Index`, and paste in [`apps-script/Index.html`](apps-script/Index.html).
+3. **Deploy → Manage deployments → pencil → Version: New version → Deploy**. The link stays the same.
+4. Students open the `/exec` link with `?class=<class id>` on the end; teachers add `?teacher=1`.
+
 ## Classes
 Four classes each have their own game, players, marks, leaderboard and results tab:
 

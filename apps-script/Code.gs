@@ -4,8 +4,9 @@
  * this script is attached to. Each class has its own game, players, marks and results.
  *
  * 1. Change TEACHER_PASSWORD below before you deploy.
- * 2. Deploy > New deployment > Web app > Execute as: Me, Who has access: Anyone.
- * 3. Paste the web app link into API_URL in index.html on GitHub. Students use the GitHub Pages link.
+ * 2. Add an HTML file called Index (File + > HTML) and paste in apps-script/Index.html.
+ * 3. Deploy > New deployment > Web app > Execute as: Me, Who has access: Anyone within your school (or Anyone).
+ * 4. Students open the web app link + ?class=<class id>. Teachers open it + ?teacher=1.
  */
 const TEACHER_PASSWORD = 'change-me';
 
@@ -18,8 +19,19 @@ const CLASSES = {
 };
 
 /* ---------- web app ---------- */
-function doGet() {
-  return ContentService.createTextOutput('The Oberursel 2050 data service is running. Students use the GitHub Pages link, not this one.');
+/** Opens the game. Students: the /exec link (add ?class=...). Teachers: add ?teacher=1. */
+function doGet(e) {
+  const p = (e && e.parameter) || {};
+  const t = HtmlService.createTemplateFromFile('Index');
+  t.settings = JSON.stringify({
+    teacher: !!p.teacher,
+    cls: CLASSES[p['class']] ? p['class'] : null,
+    base: ScriptApp.getService().getUrl()
+  });
+  return t.evaluate()
+    .setTitle('Oberursel 2050')
+    .addMetaTag('viewport', 'width=device-width, initial-scale=1')
+    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }
 function doPost(e) {
   try {
