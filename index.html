@@ -423,7 +423,7 @@ const CLASSES=[
 const className=id=>(CLASSES.find(c=>c.id===id)||{}).name||"";
 const URL_CLASS=(()=>{const c=new URLSearchParams(location.search).get("class");return CLASSES.some(x=>x.id===c)?c:null})();
 /* ===== SETUP: paste your Apps Script web app link between the quotes (see README) ===== */
-const API_URL="https://mrmroberts2010-a11y.github.io/Oberursel-2050/";
+const API_URL="https://script.google.com/a/macros/fis.edu/s/AKfycbyPb-akmJa4XZK04Sum2we0LSrZKIrOpwq7w1m52TA-A9O0GKL7EMwAJKwpGTgA_1Cv/exec";
 /* ======================================================================================= */
 const MODE=new URLSearchParams(location.search).has("teacher")?"teacher":"student";
 const CONFIGURED=/^https:\/\/script\.google(usercontent)?\.com\//.test(API_URL);
