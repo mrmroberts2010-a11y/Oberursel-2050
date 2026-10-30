@@ -213,6 +213,11 @@ img{max-width:100%}
 <div id="app"><p class="status" style="margin-top:20px">Connecting to the class game…</p></div>
 
 <script>
+/* Served by Google Apps Script: settings come from the server */
+const SERVER=<?!= settings ?>;
+const MODE=SERVER.teacher?"teacher":"student";
+const CONFIGURED=true;
+function api(fn,...args){return new Promise((res,rej)=>{google.script.run.withSuccessHandler(res).withFailureHandler(e=>rej(new Error(e&&e.message||String(e))))[fn].apply(null,args)})}
 /* ================= content ================= */
 const IND=[["eco","Economy"],["env","Environment"],["com","Community"],["con","Connectivity"]];
 const BUDGET=75, TARGET=1500, MINWORDS=20;
@@ -422,11 +427,6 @@ const CLASSES=[
 ];
 const className=id=>(CLASSES.find(c=>c.id===id)||{}).name||"";
 const URL_CLASS=CLASSES.some(x=>x.id===SERVER.cls)?SERVER.cls:null;
-/* Served by Google Apps Script: settings come from the server */
-const SERVER=<?!= settings ?>;
-const MODE=SERVER.teacher?"teacher":"student";
-const CONFIGURED=true;
-function api(fn,...args){return new Promise((res,rej)=>{google.script.run.withSuccessHandler(res).withFailureHandler(e=>rej(new Error(e&&e.message||String(e))))[fn].apply(null,args)})}
 
 let G={round:"r0",event:null,event2:null,timerEnd:null};
 const P={}, M={};
