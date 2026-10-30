@@ -909,8 +909,9 @@ function renderLogin(err){
 }
 document.addEventListener("click",async e=>{const b=e.target.closest("[data-login]");if(!b)return;
   const pw=$("#pw").value;$("#loginmsg").textContent="Checking…";
-  let ok=false;try{ok=await api("checkKey",pw)}catch(err){}
-  if(!ok){$("#loginmsg").textContent="That password isn't right.";return}
+  let ok=false;try{ok=await api("checkKey",pw)}catch(err){
+    $("#loginmsg").textContent="Can't reach the Google Sheet service ("+(err&&err.message||err)+"). In Apps Script, check Deploy → Manage deployments: Who has access must be Anyone, then deploy a New version.";return}
+  if(!ok){$("#loginmsg").textContent="The service answered, but that password doesn't match TEACHER_PASSWORD in Code.gs. After changing it there, deploy a New version.";return}
   KEY=pw;try{localStorage.setItem("ou2050-key",pw)}catch(err){}isGM=true;$("#app").innerHTML="";startTeacher()});
 document.addEventListener("keydown",e=>{if(e.key==="Enter"&&e.target.id==="pw"){const b=document.querySelector("[data-login]");if(b)b.click()}});
 function startTeacher(){
